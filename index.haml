@@ -1,0 +1,31 @@
+%html
+  %head
+    %title
+      = title
+
+    :javascript
+      var small_dimensions = '#{SMALL_SIZE}'.split('x');
+      var medium_dimensions = '#{MEDIUM_SIZE}'.split('x');
+      var large_dimensions = '#{LARGE_SIZE}'.split('x');
+
+    :css
+      .album_index h1 {
+      }
+
+      .album_index h2 {
+      }
+      #footer {
+        font-size: 75%;
+      }
+
+  %body.album_index
+    %h1
+      = title
+
+    #albums
+      = albums
+
+    %hr
+
+    #footer
+      = footer

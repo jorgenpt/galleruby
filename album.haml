@@ -1,0 +1,45 @@
+%html
+  %head
+    %title
+      = title
+
+    :css
+      h1 {
+      }
+
+      h2 {
+      }
+
+      img {
+        border-color: black;
+        border-style: solid;
+        border-width: 1px;
+        margin-right: 0.5em;
+      }
+
+      .photos a {
+        text-decoration: none;
+      }
+
+      #footer {
+        font-size: 75%;
+      }
+
+  %body.album_index
+    %h1
+      = title
+
+    %ul#menu
+      %li
+        %a(href="../") To album list
+
+      %li
+        %a(href="#") Start slideshow!
+
+    #images
+      = images
+
+    %hr
+
+    #footer
+      = footer
