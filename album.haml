@@ -3,27 +3,68 @@
     %title
       = title
 
-    :css
-      h1 {
+    = include_template 'header'
+
+    :javascript
+      var image_dir = 'large';
+
+      function start_slideshow(file) {
+        $("#slideshow_image").load(function() { 
+          $("#slideshow").css('left', ($(window).width() - $("#slideshow").outerWidth())/2.0);
+          $("#slideshow").css('top', ($(window).height() - $("#slideshow").outerHeight())/2.0 + $(window).scrollTop());
+
+          $("#slideshow, #slideshow_background").fadeIn('fast');
+
+          $("#slideshow_background").height($(document).height());
+          $("#slideshow_background").width($(document).width());
+          $("#slideshow_background").css('z-index', '1');
+        });
+
+        $("#slideshow_image").attr('src', image_dir + "/" + file);
       }
 
-      h2 {
+      function stop_slideshow() {
+        $("#slideshow").fadeOut('fast', function() {
+          $("#slideshow_image").removeAttr('src');
+        });
+        $("#slideshow_background").fadeOut('fast', function() {
+          $(this).css('z-index', '-1');
+        });
       }
 
-      img {
-        border-color: black;
-        border-style: solid;
-        border-width: 1px;
-        margin-right: 0.5em;
-      }
+      $(document).ready(function() {
+          $("<li><a href='#' id='start_slideshow'>Start slideshow!</a></li>").appendTo('#menu');
+          $("#start_slideshow").attr("href", "#slideshow=" + basename($("#images a:has(img):first").attr("href")));
 
-      .photos a {
-        text-decoration: none;
-      }
+          $("#slideshow").width(large_dimensions[0]);
+          $("#slideshow").height(large_dimensions[1]);
+          if ($("#slideshow").outerWidth() > $(window).width()
+              || $("#slideshow").outerHeight() > $(window).height()) {
+            image_dir = 'medium';
+            $("#slideshow").width(medium_dimensions[0]);
+            $("#slideshow").height(medium_dimensions[1]);
+          }
 
-      #footer {
-        font-size: 75%;
-      }
+          $("#slideshow_background").click(function() {
+            stop_slideshow();
+            return false;
+          });
+
+          $("#start_slideshow").click(function() {
+              start_slideshow(basename($("#images a:has(img):first").attr("href")));
+              return false;
+          });
+
+          $("#images a:has(img)").click(function() {
+            start_slideshow(basename($(this).attr("href")));
+            return false;
+          });
+
+          var matches = document.location.hash.match('slideshow=(.*)');
+          if (matches) {
+            start_slideshow(basename(matches[1]));
+          }
+      });
 
   %body.album_index
     %h1
@@ -33,13 +74,20 @@
       %li
         %a(href="../") To album list
 
-      %li
-        %a(href="#") Start slideshow!
-
     #images
       = images
 
-    %hr
+    %hr/
 
     #footer
-      = footer
+      = include_template 'footer'
+
+    #slideshow
+      %img#slideshow_close(src="#{ROOT}/galleruby/close.png")
+      %img#slideshow_prev(src="#{ROOT}/galleruby/prev.png")
+      %img#slideshow_next(src="#{ROOT}/galleruby/next.png")
+
+      %img#slideshow_image
+
+    #slideshow_background
+      &nbsp;
