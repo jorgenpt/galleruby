@@ -48,9 +48,9 @@
       = include_template 'footer'
 
     #slideshow(style='display: none;')
-      %img#slideshow_close(src="#{ROOT}/galleruby/close.png")
-      %img#slideshow_prev(src="#{ROOT}/galleruby/previous.png")
-      %img#slideshow_next(src="#{ROOT}/galleruby/next.png")
+      %img#slideshow_close{:src => base_relative("galleruby/close.png")}
+      %img#slideshow_prev{:src => base_relative("galleruby/previous.png")}
+      %img#slideshow_next{:src => base_relative("galleruby/next.png")}
 
       %img#slideshow_image
 

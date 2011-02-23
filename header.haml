@@ -3,6 +3,6 @@
   var medium_dimensions = [#{MEDIUM_SIZE[0]}, #{MEDIUM_SIZE[1]}];
   var large_dimensions = [#{LARGE_SIZE[0]}, #{LARGE_SIZE[1]}];
 
-%script(type='text/javascript' src="#{ROOT}/galleruby/jquery-1.5.min.js")
-%script(type='text/javascript' src="#{ROOT}/galleruby/galleruby.js")
-%link(type="text/css" rel="stylesheet" href="#{ROOT}/galleruby/galleruby.css")
+%script{:type => 'text/javascript', :src => base_relative("galleruby/jquery-1.5.min.js")}
+%script{:type => 'text/javascript', :src => base_relative("galleruby/galleruby.js")}
+%link{:type => "text/css", :rel => "stylesheet", :href => base_relative("galleruby/galleruby.css")}

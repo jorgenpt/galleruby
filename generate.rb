@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 
+require 'pp'
 require 'ftools'
 require 'yaml'
 
@@ -17,21 +18,26 @@ EXIF_DATE_FORMAT = '%Y:%m:%d %H:%M:%S'
 class Template
     @@cache = {}
 
-    def initialize(file)
+    def initialize(file, output_filename=nil, base_directory=nil)
         if not @@cache.has_key? file then
             @@cache[file] = Haml::Engine.new(File.read(file))
         end
 
         @engine = @@cache[file]
         @locals = {}
-        @output_filename = nil
+        @output_filename = output_filename
+        @base_directory = base_directory
     end
 
-    def render_to(filename, locals={})
+    def render_to(filename, locals={}, base=nil)
         @output_filename = filename
+        @base_directory = base
+
         File.open(filename, 'w') { |file|
             file.write(render(locals))
         }
+
+        @base_directory = nil
         @output_filename = nil
     end
 
@@ -51,7 +57,21 @@ class Template
     end
 
     def include_template(file, locals={})
-        Template.new("#{file}.haml").render(@locals.merge(locals))
+        template = Template.new("#{file}.haml", @output_filename, @base_directory)
+        template.render(@locals.merge(locals))
+    end
+
+    def base_relative(path)
+        pp path, @output_filename, @base_directory
+        return path if @output_filename.nil? or @base_directory.nil?
+        components = File.dirname(@output_filename).split '/'
+        if components.first != @base_directory
+            components = [".."] * components.length + [@base_directory]
+        else
+            components = [".."] * (components.length - 1)
+        end
+
+        return components.join('/') + "/#{path}"
     end
 end
 
@@ -206,7 +226,7 @@ Dir.new(directory).each { |album|
         }
     }
 
-    Template.new('album.haml').render_to(output_html, {:title => info['title'], :images_by_date => images_by_date})
+    Template.new('album.haml').render_to(output_html, {:title => info['title'], :images_by_date => images_by_date}, 'output')
 
     range_start = first_taken.strftime('%e')
     if first_taken.year == last_taken.year then
@@ -231,4 +251,4 @@ years_content = []
 index_template = Template.new 'index.per_year.haml'
 albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.sort_by {|album| album[:first]}.reverse } }
 
-Template.new('index.haml').render_to("output/index.html", {:title => "bilder.o7.no", :albums_by_year => albums_by_year})
+Template.new('index.haml').render_to("output/index.html", {:title => "bilder.o7.no", :albums_by_year => albums_by_year}, 'output')
