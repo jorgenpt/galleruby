@@ -32,8 +32,14 @@ class Template
         @engine.render(self, locals)
     end
 
+    def include_for_each(file, elements)
+        elements.map{ |element|
+            include_template(file, element)
+        }.join("\n")
+    end
+
     def include_template(file, locals={})
-        Template.new("#{file}.haml").render(locals.merge(@locals))
+        Template.new("#{file}.haml").render(@locals.merge(locals))
     end
 end
 
@@ -58,7 +64,7 @@ Magick.trace_proc = Proc.new { |which, description, id, method|
     end
 }
 
-albums = Hash.new { |hash, key| hash[key] = [] }
+albums_by_year = Hash.new { |hash, key| hash[key] = [] }
 Dir.new(directory).each { |album|
     path = "#{directory}/#{album}"
     settings_file = "#{path}/.galleruby.yaml"
@@ -100,7 +106,7 @@ Dir.new(directory).each { |album|
         }
 
         if not needs_updating 
-            albums[info['first'].strftime('%Y')] << {:name => info['title'], :link => info['link'], :date => info['date'], :first => info['first']}
+            albums_by_year[info['first'].strftime('%Y')] << {:name => info['title'], :link => info['link'], :date => info['date'], :first => info['first']}
             next
         end
     end
@@ -108,7 +114,7 @@ Dir.new(directory).each { |album|
     File.makedirs output_small, output_medium, output_large
 
     total_images = 0
-    images = Hash.new {|hash, key| hash[key] = [] }
+    images_by_date = Hash.new {|hash, key| hash[key] = [] }
     first_taken, last_taken = nil, nil
     album_dir.each { |entry|
         next if not entry.match /\.(jpe?g|png)$/i
@@ -159,8 +165,14 @@ Dir.new(directory).each { |album|
             first_taken = taken if taken < first_taken
         end
 
-        template = Template.new 'album.per_day.per_image.haml'
-        images[taken.strftime] << {:taken => taken, :html => template.render({:filename => entry, :small_width => small_image.columns, :small_height => small_image.rows})}
+        images_by_date[taken.strftime] << {
+            :taken => taken,
+            :data => {
+                :filename => entry,
+                :small_width => small_image.columns,
+                :small_height => small_image.rows
+            }
+        }
 
         small_image.destroy!
         image.destroy!
@@ -175,14 +187,14 @@ Dir.new(directory).each { |album|
         next
     end
 
-    album_content = []
-    images.sort.each {|day, image_list|
-        image_list = image_list.sort_by { |image| image[:taken] }
-        images_html = image_list.map {|image| image[:html] }.join("\n")
-        album_content << Template.new('album.per_day.haml').render({:date => Date.strptime(day), :images => images_html})
+    images_by_date = images_by_date.sort.map {|day, images|
+        {
+            :date => Date.strptime(day),
+            :images => images.sort_by {|image| image[:taken]}.map {|image| image[:data]}
+        }
     }
 
-    album_html = Template.new('album.haml').render({:title => info['title'], :images => album_content.join("\n")})
+    album_html = Template.new('album.haml').render({:title => info['title'], :images_by_date => images_by_date})
     File.open(output_html, 'w') { |f| f.write(album_html) }
 
     range_start = first_taken.strftime('%e')
@@ -195,7 +207,7 @@ Dir.new(directory).each { |album|
     end
 
     date_range = "#{range_start} - #{last_taken.strftime('%e. %b, %Y')}"
-    albums[first_taken.year] << {:name => info['title'], :link => info['link'], :date => date_range, :first => first_taken}
+    albums_by_year[first_taken.strftime('%Y')] << {:name => info['title'], :link => info['link'], :date => date_range, :first => first_taken}
 
     info['first'] = first_taken
     info['date'] = date_range
@@ -206,11 +218,7 @@ puts "All done! Generating index."
 
 years_content = []
 index_template = Template.new 'index.per_year.haml'
-albums.sort_by { |e| e[0] }.reverse.each { |year, album_list|
-    albums_template = Template.new 'index.per_year.per_album.haml'
-    albums_content = album_list.sort_by {|album| album[:first] }.reverse.map { |album| albums_template.render(album) }.join("\n")
-    years_content << index_template.render({:year => year, :albums => albums_content})
-}
+albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.sort_by {|album| album[:first]}.reverse } }
 
-index_content = Template.new('index.haml').render({:title => "bilder.o7.no", :albums => years_content.join("\n")})
+index_content = Template.new('index.haml').render({:title => "bilder.o7.no", :albums_by_year => albums_by_year})
 File.open("output/index.html", 'w') { |f| f.write(index_content) }

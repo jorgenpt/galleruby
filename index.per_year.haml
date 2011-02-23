@@ -2,4 +2,4 @@
   = year
 %a(name=year)
 %ul.album_list
-  = albums
+  = include_for_each 'index.per_year.per_album', albums

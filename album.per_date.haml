@@ -3,4 +3,4 @@
 %a{:name => date.strftime}
 
 %p.photos
-  = images
+  = include_for_each 'album.per_date.per_image', images

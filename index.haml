@@ -10,7 +10,7 @@
       = title
 
     #albums
-      = albums
+      = include_for_each 'index.per_year', albums_by_year
 
     %hr
 
