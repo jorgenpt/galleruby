@@ -1,6 +1,5 @@
 #!/usr/bin/env ruby
 
-require 'pp'
 require 'ftools'
 require 'yaml'
 
@@ -14,7 +13,7 @@ SMALL_SIZE = [320, 256]
 MEDIUM_SIZE = [800, 600]
 LARGE_SIZE = [1280, 1024]
 EXIF_DATE_FORMAT = '%Y:%m:%d %H:%M:%S'
-ROOT = '..'
+ROOT = ''
 
 class Template
     @@cache = {}
@@ -38,14 +37,47 @@ class Template
     end
 end
 
-albums = Hash.new { |hash, key| hash[key] = [] }
-Dir.new('.').each { |album|
-    settings_file = "#{album}/.galleruby.yaml"
 
-    next if not File.directory? album
+if ARGV.empty? then
+    puts "Syntax: #{$0} <directory>"
+    exit(1);
+end
+
+directory = ARGV[0]
+
+num_allocated = 0
+Magick.trace_proc = Proc.new { |which, description, id, method|
+    if which == :c then
+        num_allocated += 1
+        #puts "+ #{id} #{description} (from #{method})"
+    elsif which == :d then
+        num_allocated -= 1
+        #puts "- #{id} #{description} (from #{method})"
+    else
+        puts "Huh #{which.inspect}!"
+    end
+}
+
+albums = Hash.new { |hash, key| hash[key] = [] }
+Dir.new(directory).each { |album|
+    path = "#{directory}/#{album}"
+    settings_file = "#{path}/.galleruby.yaml"
+    skip_file = "#{path}/.galleruby.skip"
+    skiplist_file = "#{skip_file}list"
+
+    next if not File.directory? path
     next if not File.exist? settings_file
+    next if File.exist? skip_file
+
+    puts "Examining #{album}."
+
+    if File.exist? skiplist_file then
+        skiplist = YAML::load(File.read(skiplist_file)) || []
+    end
+    skiplist = [] if skiplist.nil?
 
     info = YAML::load(File.read(settings_file))
+    info = {} if info.nil?
 
     output_album = "output/#{info['link']}"
     output_small = "#{output_album}/small"
@@ -53,7 +85,7 @@ Dir.new('.').each { |album|
     output_large = "#{output_album}/large"
     output_html = "#{output_album}/index.html"
 
-    album_dir = Dir.new(album)
+    album_dir = Dir.new(path)
     if File.exist? output_html then
         last_generated = File.mtime output_html
 
@@ -61,44 +93,51 @@ Dir.new('.').each { |album|
         album_dir.each { |entry|
             next if not entry.match /\.(jpe?g|png)$/i
 
-            if last_generated < File.mtime("#{album}/#{entry}") then
+            if last_generated < File.mtime("#{path}/#{entry}") then
                 needs_updating = true
                 break
             end
         }
 
         if not needs_updating 
-            albums[info['year']] << {:name => info['title'], :link => info['link'], :date => info['date']}
+            albums[info['first'].strftime('%Y')] << {:name => info['title'], :link => info['link'], :date => info['date'], :first => info['first']}
             next
         end
     end
 
     File.makedirs output_small, output_medium, output_large
 
+    total_images = 0
     images = Hash.new {|hash, key| hash[key] = [] }
     first_taken, last_taken = nil, nil
     album_dir.each { |entry|
         next if not entry.match /\.(jpe?g|png)$/i
+        next if skiplist.include? entry
 
-        filename = "#{album}/#{entry}"
+        total_images += 1
+        filename = "#{path}/#{entry}"
         small_filename = "#{output_small}/#{entry}"
         medium_filename = "#{output_medium}/#{entry}"
         large_filename = "#{output_large}/#{entry}"
 
-        image = Image.read(filename).first.auto_orient
-        image.sync_profiles
+        image = Image.read(filename).first
+        image.auto_orient!
 
         taken = image.get_exif_by_entry('DateTime').first[1]
         taken = Date.strptime(taken, EXIF_DATE_FORMAT)
 
         if not File.exist? large_filename then
-            image.resize_to_fit!(*LARGE_SIZE)
-            image.write(large_filename)
+            new_image = image.resize_to_fit(*LARGE_SIZE)
+            new_image.write(large_filename)
+            image.destroy!
+
+            image = new_image
         end
 
         if not File.exist? medium_filename then
             medium_image = image.resize_to_fit(*MEDIUM_SIZE)
             medium_image.write(medium_filename)
+            medium_image.destroy!
         end
 
         if not File.exist? small_filename then
@@ -122,7 +161,19 @@ Dir.new('.').each { |album|
 
         template = Template.new 'album.per_day.per_image.haml'
         images[taken.strftime] << {:taken => taken, :html => template.render({:filename => entry, :small_width => small_image.columns, :small_height => small_image.rows})}
+
+        small_image.destroy!
+        image.destroy!
+
+        if num_allocated > 0 then
+            puts "Num allocated: #{num_allocated}"
+        end
     }
+
+    if total_images == 0 then
+        puts "No images, ignoring album"
+        next
+    end
 
     album_content = []
     images.sort.each {|day, image_list|
@@ -144,18 +195,20 @@ Dir.new('.').each { |album|
     end
 
     date_range = "#{range_start} - #{last_taken.strftime('%e. %b, %Y')}"
-    albums[first_taken.year] << {:name => info['title'], :link => info['link'], :date => date_range}
+    albums[first_taken.year] << {:name => info['title'], :link => info['link'], :date => date_range, :first => first_taken}
 
-    info['year'] = first_taken.year
+    info['first'] = first_taken
     info['date'] = date_range
     File.open(settings_file, 'w') {|file| file.write(YAML.dump(info)) }
 }
 
+puts "All done! Generating index."
+
 years_content = []
 index_template = Template.new 'index.per_year.haml'
-albums.each { |year, album_list|
+albums.sort_by { |e| e[0] }.reverse.each { |year, album_list|
     albums_template = Template.new 'index.per_year.per_album.haml'
-    albums_content = album_list.map { |album| albums_template.render(album) }.join("\n")
+    albums_content = album_list.sort_by {|album| album[:first] }.reverse.map { |album| albums_template.render(album) }.join("\n")
     years_content << index_template.render({:year => year, :albums => albums_content})
 }
 

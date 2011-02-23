@@ -6,63 +6,28 @@
     = include_template 'header'
 
     :javascript
-      var image_dir = 'large';
-
-      function start_slideshow(file) {
-        $("#slideshow_image").load(function() { 
-          $("#slideshow").css('left', ($(window).width() - $("#slideshow").outerWidth())/2.0);
-          $("#slideshow").css('top', ($(window).height() - $("#slideshow").outerHeight())/2.0 + $(window).scrollTop());
-
-          $("#slideshow, #slideshow_background").fadeIn('fast');
-
-          $("#slideshow_background").height($(document).height());
-          $("#slideshow_background").width($(document).width());
-          $("#slideshow_background").css('z-index', '1');
-        });
-
-        $("#slideshow_image").attr('src', image_dir + "/" + file);
-      }
-
-      function stop_slideshow() {
-        $("#slideshow").fadeOut('fast', function() {
-          $("#slideshow_image").removeAttr('src');
-        });
-        $("#slideshow_background").fadeOut('fast', function() {
-          $(this).css('z-index', '-1');
-        });
-      }
-
       $(document).ready(function() {
-          $("<li><a href='#' id='start_slideshow'>Start slideshow!</a></li>").appendTo('#menu');
-          $("#start_slideshow").attr("href", "#slideshow=" + basename($("#images a:has(img):first").attr("href")));
+          $("<li><a href='#' id='slideshow_start'>Start slideshow!</a></li>").appendTo('#menu');
+          $("#slideshow_start").attr("href", "#slideshow=0");
 
-          $("#slideshow").width(large_dimensions[0]);
-          $("#slideshow").height(large_dimensions[1]);
-          if ($("#slideshow").outerWidth() > $(window).width()
-              || $("#slideshow").outerHeight() > $(window).height()) {
-            image_dir = 'medium';
-            $("#slideshow").width(medium_dimensions[0]);
-            $("#slideshow").height(medium_dimensions[1]);
-          }
-
-          $("#slideshow_background").click(function() {
-            stop_slideshow();
-            return false;
+          $("#images img").each(function(index, element) {
+            images[index] = basename(element.src);
+            $(element).parent().click(function() {
+                slideshow_start(index);
+                return false;
+            });
           });
 
-          $("#start_slideshow").click(function() {
-              start_slideshow(basename($("#images a:has(img):first").attr("href")));
+          slideshow_init();
+
+          $("#slideshow_start").click(function() {
+              slideshow_start(0);
               return false;
-          });
-
-          $("#images a:has(img)").click(function() {
-            start_slideshow(basename($(this).attr("href")));
-            return false;
           });
 
           var matches = document.location.hash.match('slideshow=(.*)');
           if (matches) {
-            start_slideshow(basename(matches[1]));
+            slideshow_start(parseInt(matches[1]) || 0);
           }
       });
 
@@ -84,7 +49,7 @@
 
     #slideshow
       %img#slideshow_close(src="#{ROOT}/galleruby/close.png")
-      %img#slideshow_prev(src="#{ROOT}/galleruby/prev.png")
+      %img#slideshow_prev(src="#{ROOT}/galleruby/previous.png")
       %img#slideshow_next(src="#{ROOT}/galleruby/next.png")
 
       %img#slideshow_image
