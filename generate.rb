@@ -13,7 +13,6 @@ SMALL_SIZE = [320, 256]
 MEDIUM_SIZE = [800, 600]
 LARGE_SIZE = [1280, 1024]
 EXIF_DATE_FORMAT = '%Y:%m:%d %H:%M:%S'
-ROOT = ''
 
 class Template
     @@cache = {}
@@ -25,9 +24,22 @@ class Template
 
         @engine = @@cache[file]
         @locals = {}
+        @output_filename = nil
+    end
+
+    def render_to(filename, locals={})
+        @output_filename = filename
+        File.open(filename, 'w') { |file|
+            file.write(render(locals))
+        }
+        @output_filename = nil
     end
 
     def render(locals={})
+        if @output_filename.nil?
+            @output_filename = ''
+        end
+
         @locals = locals
         @engine.render(self, locals)
     end
@@ -194,8 +206,7 @@ Dir.new(directory).each { |album|
         }
     }
 
-    album_html = Template.new('album.haml').render({:title => info['title'], :images_by_date => images_by_date})
-    File.open(output_html, 'w') { |f| f.write(album_html) }
+    Template.new('album.haml').render_to(output_html, {:title => info['title'], :images_by_date => images_by_date})
 
     range_start = first_taken.strftime('%e')
     if first_taken.year == last_taken.year then
@@ -220,5 +231,4 @@ years_content = []
 index_template = Template.new 'index.per_year.haml'
 albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.sort_by {|album| album[:first]}.reverse } }
 
-index_content = Template.new('index.haml').render({:title => "bilder.o7.no", :albums_by_year => albums_by_year})
-File.open("output/index.html", 'w') { |f| f.write(index_content) }
+Template.new('index.haml').render_to("output/index.html", {:title => "bilder.o7.no", :albums_by_year => albums_by_year})
