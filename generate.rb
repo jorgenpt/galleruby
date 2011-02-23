@@ -1,6 +1,5 @@
 #!/usr/bin/env ruby
 
-require 'pp'
 require 'ftools'
 require 'yaml'
 
@@ -62,7 +61,6 @@ class Template
     end
 
     def base_relative(path)
-        pp path, @output_filename, @base_directory
         return path if @output_filename.nil? or @base_directory.nil?
         components = File.dirname(@output_filename).split '/'
         if components.first != @base_directory
@@ -129,7 +127,7 @@ Dir.new(directory).each { |album|
 
         needs_updating = false
         album_dir.each { |entry|
-            next if not entry.match /\.(jpe?g|png)$/i
+            next if not entry.match /\.jpe?g$/i
 
             if last_generated < File.mtime("#{path}/#{entry}") then
                 needs_updating = true
@@ -149,7 +147,7 @@ Dir.new(directory).each { |album|
     images_by_date = Hash.new {|hash, key| hash[key] = [] }
     first_taken, last_taken = nil, nil
     album_dir.each { |entry|
-        next if not entry.match /\.(jpe?g|png)$/i
+        next if not entry.match /\.jpe?g$/i
         next if skiplist.include? entry
 
         total_images += 1
