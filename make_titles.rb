@@ -11,7 +11,7 @@ end
 
 directory = ARGV[0]
 Dir.new(directory).each { |album|
-    settings_file = "#{directory}/#{album}/.galleruby.yaml"
+    settings_file = "#{directory}/#{album}/.galleruby.yml"
     skip_file = "#{directory}/#{album}/.galleruby.skip"
 
     next if album.start_with? '.'

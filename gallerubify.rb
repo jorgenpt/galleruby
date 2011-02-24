@@ -124,7 +124,7 @@ class Album
     def initialize(directory, name)
         @name = name
         @path = "#{directory}/#{name}"
-        @settings_file = "#{@path}/.galleruby.yaml"
+        @settings_file = "#{@path}/.galleruby.yml"
         @skip_file = "#{@path}/.galleruby.skip"
 
 
