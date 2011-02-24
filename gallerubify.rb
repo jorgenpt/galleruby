@@ -38,6 +38,7 @@ class Template
     @@cache = {}
 
     def initialize(file, output_filename=nil, base_directory=nil)
+        file = "templates/#{file}.haml"
         if not @@cache.has_key? file then
             @@cache[file] = Haml::Engine.new(File.read(file))
         end
@@ -76,7 +77,7 @@ class Template
     end
 
     def include_template(file, locals={})
-        template = Template.new("#{file}.haml", @output_filename, @base_directory)
+        template = Template.new(file, @output_filename, @base_directory)
         template.render(@locals.merge(locals))
     end
 
@@ -284,7 +285,7 @@ class Album
         end
 
         output_file = "#{output_directory}/#{@info['link']}/index.html"
-        Template.new('album.haml').render_to(output_file, {:config => config, :title => @info['title'], :images_by_date => images_by_date}, output_directory)
+        Template.new('album').render_to(output_file, {:config => config, :title => @info['title'], :images_by_date => images_by_date}, output_directory)
     end
 
     def year
@@ -350,7 +351,6 @@ end
 puts "All done! Generating index."
 
 years_content = []
-index_template = Template.new 'index.per_year.haml'
 albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
 
-Template.new('index.haml').render_to("#{output_directory}/index.html", {:config => config, :albums_by_year => albums_by_year}, output_directory)
+Template.new('index').render_to("#{output_directory}/index.html", {:config => config, :albums_by_year => albums_by_year}, output_directory)
