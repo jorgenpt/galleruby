@@ -31,9 +31,6 @@ require 'rubygems'
 require 'RMagick'
 require 'haml'
 
-SMALL_SIZE = [320, 256]
-MEDIUM_SIZE = [800, 600]
-LARGE_SIZE = [1280, 1024]
 EXIF_DATE_FORMAT = '%Y:%m:%d %H:%M:%S'
 TRACK_ALLOCATIONS = false
 
@@ -120,27 +117,6 @@ opts.each do |opt, arg|
     end
 end
 
-if ARGV.empty? then
-    RDoc::usage
-    exit 1
-end
-
-directory = ARGV[0]
-
-num_allocated = 0
-if TRACK_ALLOCATIONS then
-    Magick.trace_proc = Proc.new { |which, description, id, method|
-        if which == :c then
-            num_allocated += 1
-            #puts "+ #{id} #{description} (from #{method})"
-        elsif which == :d then
-            num_allocated -= 1
-            #puts "- #{id} #{description} (from #{method})"
-        end
-    }
-end
-
-
 class Album
     attr_reader :name
 
@@ -195,7 +171,7 @@ class Album
         return true
     end
 
-    def process(output_directory)
+    def process(config, output_directory)
         to_process = []
         Dir.new(@path).each { |entry|
             next if not entry.match /\.jpe?g$/i
@@ -231,7 +207,7 @@ class Album
             taken = Date.strptime(taken, EXIF_DATE_FORMAT)
 
             if not File.exist? large_filename then
-                new_image = image.resize_to_fit(*LARGE_SIZE)
+                new_image = image.resize_to_fit(*config['large'])
                 new_image.write(large_filename)
                 image.destroy!
 
@@ -239,13 +215,13 @@ class Album
             end
 
             if not File.exist? medium_filename then
-                medium_image = image.resize_to_fit(*MEDIUM_SIZE)
+                medium_image = image.resize_to_fit(*config['medium'])
                 medium_image.write(medium_filename)
                 medium_image.destroy!
             end
 
             if not File.exist? small_filename then
-                small_image = image.resize_to_fit(*SMALL_SIZE)
+                small_image = image.resize_to_fit(*config['small'])
                 small_image.write(small_filename)
             else
                 small_image = Magick::Image.ping(small_filename).first
@@ -299,7 +275,7 @@ class Album
         return true
     end
 
-    def render_to(output_directory)
+    def render_to(config, output_directory)
         images_by_date = @images_by_date.sort.map do |day, images|
             {
                 :date => Date.strptime(day),
@@ -308,7 +284,7 @@ class Album
         end
 
         output_file = "#{output_directory}/#{@info['link']}/index.html"
-        Template.new('album.haml').render_to(output_file, {:title => @info['title'], :images_by_date => images_by_date}, output_directory)
+        Template.new('album.haml').render_to(output_file, {:config => config, :title => @info['title'], :images_by_date => images_by_date}, output_directory)
     end
 
     def year
@@ -320,6 +296,35 @@ class Album
     end
 end
 
+if ARGV.empty? then
+    RDoc::usage
+    exit 1
+end
+
+directory = ARGV[0]
+
+# These are default options
+config = {
+    'title' => 'My Gallery',
+    'small' => [320, 256],
+    'medium' => [800, 600],
+    'large' => [1280, 1024]
+}
+config.merge!(YAML::load(File.read(config_file)) || {})
+
+num_allocated = 0
+if TRACK_ALLOCATIONS then
+    Magick.trace_proc = Proc.new { |which, description, id, method|
+        if which == :c then
+            num_allocated += 1
+            #puts "+ #{id} #{description} (from #{method})"
+        elsif which == :d then
+            num_allocated -= 1
+            #puts "- #{id} #{description} (from #{method})"
+        end
+    }
+end
+
 albums_by_year = Hash.new { |hash, key| hash[key] = [] }
 Dir.new(directory).each do |album|
     album = Album.new(directory, album)
@@ -328,13 +333,13 @@ Dir.new(directory).each do |album|
 
     if force_regenerate or album.needs_updating? output_directory
         puts "#{album.name}: Processing album"
-        if not album.process output_directory then
+        if not album.process config, output_directory then
             puts "#{album.name}: WARNING! No images to process, skipping"
             next
         end
 
         puts "#{album.name}: Rendering HTML"
-        album.render_to output_directory
+        album.render_to config, output_directory
     else
         puts "#{album.name}: No update needed, skipping"
     end
@@ -348,6 +353,4 @@ years_content = []
 index_template = Template.new 'index.per_year.haml'
 albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
 
-config = {'title' => 'My Gallery'}
-config.merge!(YAML::load(File.read(config_file)) || {})
-Template.new('index.haml').render_to("output/index.html", {:title => config['title'], :albums_by_year => albums_by_year}, output_directory)
+Template.new('index.haml').render_to("#{output_directory}/index.html", {:config => config, :albums_by_year => albums_by_year}, output_directory)

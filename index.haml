@@ -1,13 +1,13 @@
 %html
   %head
     %title
-      = title
+      = config['title']
 
     = include_template 'header'
 
   %body.album_index
     %h1
-      = title
+      = config['title']
 
     #albums
       = include_for_each 'index.per_year', albums_by_year

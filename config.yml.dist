@@ -1,1 +1,4 @@
 title: Cool Joe's Gallery
+small: [320, 256]
+medium: [800, 600]
+large: [1280, 1024]
