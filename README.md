@@ -34,8 +34,9 @@ Dependencies
 ============
 
 Galleruby has two external gem dependencies:
- * RMagick
- * HAML
+
+* RMagick
+* HAML
 
 You can install these using:
     gem install rmagick haml
@@ -43,7 +44,7 @@ You can install these using:
 Using Galleruby
 ===============
 
-First, Galleruby  identifies albums eligible for upload by looking for a
+First, Galleruby identifies albums eligible for upload by looking for a
 .galleruby.yaml file in the album directory. This file is expected to initially
 contain the user-displayed title of the album (e.g. "Birthday party!") and the
 shortname of the album, which is what the server-side output directory will be
@@ -52,13 +53,15 @@ called (e.g.  "birthdayparty").
 So, to get started, you need to generate these files using the make_titles.rb
 script. It will suggest defaults you can use by pressing enter - and if you
 don't want a directory included, press ctrl+D and it'll forever skip this
-direcotry when you run make_titles.rb (and not create a .galleruby.yaml). To
+directory when you run make_titles.rb (and not create a .galleruby.yaml). To
 revert this behavior for a directory, delete the .galleruby.skip file.
+    ./make_titles.rb ~/Pictures/Events
 
 Second, you just need to run gallerubify - but copy config.yml.dist to
 config.yml and edit it first. Running gallerubify will take some time, as it's
 generating three resized versions of your files for publishing. You can change
 what these sizes are by editing config.yml.
+    ./gallerubify.rb ~/Pictures/Events
 
 Third, you need to put the static directory as 'galleruby' in your output dir:
     cp -r static output/galleruby
@@ -94,4 +97,4 @@ that we skipped publishing "Very private photos" by pressing ctrl-D.
     All done! Generating index.
 
     $ cp -r static output/galleruby
-    $ s3sync.rb output mybucket:
+    $ s3sync.rb -vrp output/ my_gallery_bucket:
