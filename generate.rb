@@ -1,13 +1,29 @@
 #!/usr/bin/env ruby
+#
+# == Synposis
+#
+# generate.rb: generates gallery from directories
+#
+# == Usage
+#
+# generate.rb [OPTION] ... DIR
+#
+# -h, --help:
+#   show help
+#
+# -o <out>, --output <out>:
+#   generates output gallery in <out> instead of the default output/
+#
+# DIR: The directory to look for input albums in.
 
 require 'ftools'
 require 'yaml'
+require 'getoptlong'
+require 'rdoc/usage'
 
 require 'rubygems'
 require 'RMagick'
 require 'haml'
-
-include Magick
 
 SMALL_SIZE = [320, 256]
 MEDIUM_SIZE = [800, 600]
@@ -50,7 +66,7 @@ class Template
     end
 
     def include_for_each(file, elements)
-        elements.map{ |element|
+        elements.map { |element|
             include_template(file, element)
         }.join("\n")
     end
@@ -73,10 +89,24 @@ class Template
     end
 end
 
+opts = GetoptLong.new(
+    [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
+    [ '--output', '-o', GetoptLong::OPTIONAL_ARGUMENT ]
+)
+
+output_directory = 'output'
+opts.each do |opt, arg|
+    case opt
+    when '--help' 
+        RDoc::usage
+    when '--output'
+        output_directory = arg
+    end
+end
 
 if ARGV.empty? then
-    puts "Syntax: #{$0} <directory>"
-    exit(1);
+    RDoc::usage
+    exit 1
 end
 
 directory = ARGV[0]
@@ -94,6 +124,8 @@ Magick.trace_proc = Proc.new { |which, description, id, method|
     end
 }
 
+File.makedirs output_directory
+
 albums_by_year = Hash.new { |hash, key| hash[key] = [] }
 Dir.new(directory).each { |album|
     path = "#{directory}/#{album}"
@@ -101,6 +133,7 @@ Dir.new(directory).each { |album|
     skip_file = "#{path}/.galleruby.skip"
     skiplist_file = "#{skip_file}list"
 
+    next if album.start_with? '.'
     next if not File.directory? path
     next if not File.exist? settings_file
     next if File.exist? skip_file
@@ -115,7 +148,7 @@ Dir.new(directory).each { |album|
     info = YAML::load(File.read(settings_file))
     info = {} if info.nil?
 
-    output_album = "output/#{info['link']}"
+    output_album = "#{output_directory}/#{info['link']}"
     output_small = "#{output_album}/small"
     output_medium = "#{output_album}/medium"
     output_large = "#{output_album}/large"
@@ -156,7 +189,7 @@ Dir.new(directory).each { |album|
         medium_filename = "#{output_medium}/#{entry}"
         large_filename = "#{output_large}/#{entry}"
 
-        image = Image.read(filename).first
+        image = Magick::Image.read(filename).first
         image.auto_orient!
 
         taken = image.get_exif_by_entry('DateTime').first[1]
@@ -180,7 +213,7 @@ Dir.new(directory).each { |album|
             small_image = image.resize_to_fit(*SMALL_SIZE)
             small_image.write(small_filename)
         else
-            small_image = Image.ping(small_filename).first
+            small_image = Magick::Image.ping(small_filename).first
         end
 
         if last_taken.nil? then
@@ -224,7 +257,7 @@ Dir.new(directory).each { |album|
         }
     }
 
-    Template.new('album.haml').render_to(output_html, {:title => info['title'], :images_by_date => images_by_date}, 'output')
+    Template.new('album.haml').render_to(output_html, {:title => info['title'], :images_by_date => images_by_date}, output_directory)
 
     range_start = first_taken.strftime('%e')
     if first_taken.year == last_taken.year then
@@ -249,4 +282,4 @@ years_content = []
 index_template = Template.new 'index.per_year.haml'
 albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.sort_by {|album| album[:first]}.reverse } }
 
-Template.new('index.haml').render_to("output/index.html", {:title => "bilder.o7.no", :albums_by_year => albums_by_year}, 'output')
+Template.new('index.haml').render_to("#{output_directory}/index.html", {:title => "bilder.o7.no", :albums_by_year => albums_by_year}, output_directory)
