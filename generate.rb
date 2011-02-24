@@ -17,6 +17,9 @@
 # -c <config>, --config <config>:
 #   reads configuration options from <config> instead of config.yml
 #
+# -f, --force
+#   forces regeneration of HTML files even if we think they album is unchanged.
+#
 # DIR: The directory to look for input albums in.
 
 require 'ftools'
@@ -97,11 +100,13 @@ end
 opts = GetoptLong.new(
     [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
     [ '--output', '-o', GetoptLong::OPTIONAL_ARGUMENT ],
-    [ '--config', '-c', GetoptLong::OPTIONAL_ARGUMENT ]
+    [ '--config', '-c', GetoptLong::OPTIONAL_ARGUMENT ],
+    [ '--force', '-f', GetoptLong::NO_ARGUMENT ]
 )
 
 output_directory = 'output'
 config_file = 'config.yml'
+force_regenerate = false
 opts.each do |opt, arg|
     case opt
     when '--help'
@@ -110,6 +115,8 @@ opts.each do |opt, arg|
         output_directory = arg
     when '--config'
         config_file = arg
+    when '--force'
+        force_regenerate = true
     end
 end
 
@@ -319,7 +326,7 @@ Dir.new(directory).each do |album|
 
     next if not album.valid?
 
-    if album.needs_updating? output_directory
+    if force_regenerate or album.needs_updating? output_directory
         puts "#{album.name}: Processing album"
         if not album.process output_directory then
             puts "#{album.name}: WARNING! No images to process, skipping"
