@@ -244,8 +244,8 @@ class Album
                 :taken => taken,
                 :data => {
                     :filename => entry,
-                    :small_width => small_image.columns,
-                    :small_height => small_image.rows
+                    :thumb_width => small_image.columns,
+                    :thumb_height => small_image.rows
                 }
             }
 
