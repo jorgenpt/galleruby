@@ -29,6 +29,7 @@ SMALL_SIZE = [320, 256]
 MEDIUM_SIZE = [800, 600]
 LARGE_SIZE = [1280, 1024]
 EXIF_DATE_FORMAT = '%Y:%m:%d %H:%M:%S'
+TRACK_ALLOCATIONS = false
 
 class Template
     @@cache = {}
@@ -112,174 +113,224 @@ end
 directory = ARGV[0]
 
 num_allocated = 0
-Magick.trace_proc = Proc.new { |which, description, id, method|
-    if which == :c then
-        num_allocated += 1
-        #puts "+ #{id} #{description} (from #{method})"
-    elsif which == :d then
-        num_allocated -= 1
-        #puts "- #{id} #{description} (from #{method})"
-    else
-        puts "Huh #{which.inspect}!"
+if TRACK_ALLOCATIONS then
+    Magick.trace_proc = Proc.new { |which, description, id, method|
+        if which == :c then
+            num_allocated += 1
+            #puts "+ #{id} #{description} (from #{method})"
+        elsif which == :d then
+            num_allocated -= 1
+            #puts "- #{id} #{description} (from #{method})"
+        end
+    }
+end
+
+
+class Album
+    attr_reader :name
+
+    def initialize(directory, name)
+        @name = name
+        @path = "#{directory}/#{name}"
+        @settings_file = "#{@path}/.galleruby.yaml"
+        @skip_file = "#{@path}/.galleruby.skip"
+
+
+        skiplist_file = "#{@skip_file}list"
+        if File.exist? skiplist_file then
+            @skiplist = YAML::load(File.read(skiplist_file))
+        end
+        @skiplist ||= []
+
+        if valid? then
+            @info = YAML::load(File.read(@settings_file))
+        end
+
+        @info ||= {}
+
+        @images_by_date = nil
     end
-}
 
-File.makedirs output_directory
+    def valid?
+        return false if @name.start_with? '.'
+        return false if not File.directory? @path
+        return false if not File.exist? @settings_file
+        return false if File.exist? @skip_file
 
-albums_by_year = Hash.new { |hash, key| hash[key] = [] }
-Dir.new(directory).each { |album|
-    path = "#{directory}/#{album}"
-    settings_file = "#{path}/.galleruby.yaml"
-    skip_file = "#{path}/.galleruby.skip"
-    skiplist_file = "#{skip_file}list"
-
-    next if album.start_with? '.'
-    next if not File.directory? path
-    next if not File.exist? settings_file
-    next if File.exist? skip_file
-
-    puts "Examining #{album}."
-
-    if File.exist? skiplist_file then
-        skiplist = YAML::load(File.read(skiplist_file)) || []
+        return true
     end
-    skiplist = [] if skiplist.nil?
 
-    info = YAML::load(File.read(settings_file))
-    info = {} if info.nil?
+    def needs_updating? output_directory
+        output_file = "#{output_directory}/#{@info['link']}/index.html"
+        if File.exist? output_file then
+            last_generated = File.mtime output_file
 
-    output_album = "#{output_directory}/#{info['link']}"
-    output_small = "#{output_album}/small"
-    output_medium = "#{output_album}/medium"
-    output_large = "#{output_album}/large"
-    output_html = "#{output_album}/index.html"
+            needs_updating = false
+            Dir.new(@path).each { |entry|
+                next if not entry.match /\.jpe?g$/i
 
-    album_dir = Dir.new(path)
-    if File.exist? output_html then
-        last_generated = File.mtime output_html
+                if last_generated < File.mtime("#{@path}/#{entry}") then
+                    return true
+                end
+            }
 
-        needs_updating = false
-        album_dir.each { |entry|
+            return false
+        end
+
+        return true
+    end
+
+    def process(output_directory)
+        to_process = []
+        Dir.new(@path).each { |entry|
             next if not entry.match /\.jpe?g$/i
+            next if @skiplist.include? entry
 
-            if last_generated < File.mtime("#{path}/#{entry}") then
-                needs_updating = true
-                break
-            end
+            to_process << entry
         }
 
-        if not needs_updating 
-            albums_by_year[info['first'].strftime('%Y')] << {:name => info['title'], :link => info['link'], :date => info['date'], :first => info['first']}
-            next
+        if to_process.empty?
+            return false
         end
-    end
 
-    File.makedirs output_small, output_medium, output_large
+        output_album = "#{output_directory}/#{@info['link']}"
+        output_small = "#{output_album}/small"
+        output_medium = "#{output_album}/medium"
+        output_large = "#{output_album}/large"
 
-    total_images = 0
-    images_by_date = Hash.new {|hash, key| hash[key] = [] }
-    first_taken, last_taken = nil, nil
-    album_dir.each { |entry|
-        next if not entry.match /\.jpe?g$/i
-        next if skiplist.include? entry
+        File.makedirs output_small, output_medium, output_large
 
-        total_images += 1
-        filename = "#{path}/#{entry}"
-        small_filename = "#{output_small}/#{entry}"
-        medium_filename = "#{output_medium}/#{entry}"
-        large_filename = "#{output_large}/#{entry}"
+        @images_by_date = Hash.new {|hash, key| hash[key] = [] }
+        first_taken, last_taken = nil, nil
 
-        image = Magick::Image.read(filename).first
-        image.auto_orient!
+        to_process.each do |entry|
+            filename = "#{@path}/#{entry}"
+            small_filename = "#{output_small}/#{entry}"
+            medium_filename = "#{output_medium}/#{entry}"
+            large_filename = "#{output_large}/#{entry}"
 
-        taken = image.get_exif_by_entry('DateTime').first[1]
-        taken = Date.strptime(taken, EXIF_DATE_FORMAT)
+            image = Magick::Image.read(filename).first
+            image.auto_orient!
 
-        if not File.exist? large_filename then
-            new_image = image.resize_to_fit(*LARGE_SIZE)
-            new_image.write(large_filename)
+            taken = image.get_exif_by_entry('DateTime').first[1]
+            taken = Date.strptime(taken, EXIF_DATE_FORMAT)
+
+            if not File.exist? large_filename then
+                new_image = image.resize_to_fit(*LARGE_SIZE)
+                new_image.write(large_filename)
+                image.destroy!
+
+                image = new_image
+            end
+
+            if not File.exist? medium_filename then
+                medium_image = image.resize_to_fit(*MEDIUM_SIZE)
+                medium_image.write(medium_filename)
+                medium_image.destroy!
+            end
+
+            if not File.exist? small_filename then
+                small_image = image.resize_to_fit(*SMALL_SIZE)
+                small_image.write(small_filename)
+            else
+                small_image = Magick::Image.ping(small_filename).first
+            end
+
+            if last_taken.nil? then
+                last_taken = taken
+            else
+                last_taken = taken if taken > last_taken
+            end
+
+            if first_taken.nil? then
+                first_taken = taken
+            else
+                first_taken = taken if taken < first_taken
+            end
+
+            @images_by_date[taken.strftime] << {
+                :taken => taken,
+                :data => {
+                    :filename => entry,
+                    :small_width => small_image.columns,
+                    :small_height => small_image.rows
+                }
+            }
+
+            small_image.destroy!
             image.destroy!
 
-            image = new_image
+            if TRACK_ALLOCATIONS and num_allocated > 0 then
+                puts "#{name}: Num allocated: #{num_allocated}"
+            end
         end
 
-        if not File.exist? medium_filename then
-            medium_image = image.resize_to_fit(*MEDIUM_SIZE)
-            medium_image.write(medium_filename)
-            medium_image.destroy!
-        end
-
-        if not File.exist? small_filename then
-            small_image = image.resize_to_fit(*SMALL_SIZE)
-            small_image.write(small_filename)
+        range_start = first_taken.strftime('%e')
+        if first_taken.year == last_taken.year then
+            if first_taken.month != last_taken.month then
+                range_start << first_taken.strftime('. %b')
+            end
         else
-            small_image = Magick::Image.ping(small_filename).first
+            range_start << first_taken.strftime('. %b, %Y')
         end
 
-        if last_taken.nil? then
-            last_taken = taken
-        else
-            last_taken = taken if taken > last_taken
-        end
+        date_range = "#{range_start} - #{last_taken.strftime('%e. %b, %Y')}"
 
-        if first_taken.nil? then
-            first_taken = taken
-        else
-            first_taken = taken if taken < first_taken
-        end
+        @info['first'] = first_taken
+        @info['date'] = date_range
 
-        images_by_date[taken.strftime] << {
-            :taken => taken,
-            :data => {
-                :filename => entry,
-                :small_width => small_image.columns,
-                :small_height => small_image.rows
+        File.open(@settings_file, 'w') { |file| file.write(YAML.dump(@info)) }
+
+        return true
+    end
+
+    def render_to(output_directory)
+        images_by_date = @images_by_date.sort.map do |day, images|
+            {
+                :date => Date.strptime(day),
+                :images => images.sort_by {|image| image[:taken]}.map {|image| image[:data]}
             }
-        }
-
-        small_image.destroy!
-        image.destroy!
-
-        if num_allocated > 0 then
-            puts "Num allocated: #{num_allocated}"
         end
-    }
 
-    if total_images == 0 then
-        puts "No images, ignoring album"
-        next
+        output_file = "#{output_directory}/#{@info['link']}/index.html"
+        Template.new('album.haml').render_to(output_file, {:title => @info['title'], :images_by_date => images_by_date}, output_directory)
     end
 
-    images_by_date = images_by_date.sort.map {|day, images|
-        {
-            :date => Date.strptime(day),
-            :images => images.sort_by {|image| image[:taken]}.map {|image| image[:data]}
-        }
-    }
+    def year
+        @info['first'].strftime('%Y')
+    end
 
-    Template.new('album.haml').render_to(output_html, {:title => info['title'], :images_by_date => images_by_date}, output_directory)
+    def template_info
+        {:name => @info['title'], :link => @info['link'], :date => @info['date'], :first => @info['first']}
+    end
+end
 
-    range_start = first_taken.strftime('%e')
-    if first_taken.year == last_taken.year then
-        if first_taken.month != last_taken.month then
-            range_start << first_taken.strftime('. %b')
+albums_by_year = Hash.new { |hash, key| hash[key] = [] }
+Dir.new(directory).each do |album|
+    album = Album.new(directory, album)
+
+    next if not album.valid?
+
+    if album.needs_updating? output_directory
+        puts "#{album.name}: Processing album"
+        if not album.process output_directory then
+            puts "#{album.name}: WARNING! No images to process, skipping"
+            next
         end
+
+        puts "#{album.name}: Rendering HTML"
+        album.render_to output_directory
     else
-        range_start << first_taken.strftime('. %b, %Y')
+        puts "#{album.name}: No update needed, skipping"
     end
 
-    date_range = "#{range_start} - #{last_taken.strftime('%e. %b, %Y')}"
-    albums_by_year[first_taken.strftime('%Y')] << {:name => info['title'], :link => info['link'], :date => date_range, :first => first_taken}
-
-    info['first'] = first_taken
-    info['date'] = date_range
-    File.open(settings_file, 'w') {|file| file.write(YAML.dump(info)) }
-}
+    albums_by_year[album.year] << album
+end
 
 puts "All done! Generating index."
 
 years_content = []
 index_template = Template.new 'index.per_year.haml'
-albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.sort_by {|album| album[:first]}.reverse } }
+albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
 
-Template.new('index.haml').render_to("#{output_directory}/index.html", {:title => "bilder.o7.no", :albums_by_year => albums_by_year}, output_directory)
+Template.new('index.haml').render_to("output/index.html", {:title => "bilder.o7.no", :albums_by_year => albums_by_year}, output_directory)
