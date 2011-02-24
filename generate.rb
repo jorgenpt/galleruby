@@ -14,6 +14,9 @@
 # -o <out>, --output <out>:
 #   generates output gallery in <out> instead of the default output/
 #
+# -c <config>, --config <config>:
+#   reads configuration options from <config> instead of config.yml
+#
 # DIR: The directory to look for input albums in.
 
 require 'ftools'
@@ -85,23 +88,28 @@ class Template
         else
             components = [".."] * (components.length - 1)
         end
+        components << path
 
-        return components.join('/') + "/#{path}"
+        return components.join('/')
     end
 end
 
 opts = GetoptLong.new(
     [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
-    [ '--output', '-o', GetoptLong::OPTIONAL_ARGUMENT ]
+    [ '--output', '-o', GetoptLong::OPTIONAL_ARGUMENT ],
+    [ '--config', '-c', GetoptLong::OPTIONAL_ARGUMENT ]
 )
 
 output_directory = 'output'
+config_file = 'config.yml'
 opts.each do |opt, arg|
     case opt
-    when '--help' 
+    when '--help'
         RDoc::usage
     when '--output'
         output_directory = arg
+    when '--config'
+        config_file = arg
     end
 end
 
@@ -333,4 +341,6 @@ years_content = []
 index_template = Template.new 'index.per_year.haml'
 albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
 
-Template.new('index.haml').render_to("output/index.html", {:title => "bilder.o7.no", :albums_by_year => albums_by_year}, output_directory)
+config = {'title' => 'My Gallery'}
+config.merge!(YAML::load(File.read(config_file)) || {})
+Template.new('index.haml').render_to("output/index.html", {:title => config['title'], :albums_by_year => albums_by_year}, output_directory)
