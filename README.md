@@ -14,7 +14,7 @@ for your picture setup. I'm aware of the following ones:
    albums do not have sub-directories.
 
 As an example of the latter, this is similar to what my local layout is:
-    ~/Pictures/Events/
+    ~/Pictures/Albums/
         Birthday party 2009/
             IMG_3101.JPG
             IMG_3102.JPG
@@ -55,16 +55,16 @@ script. It will suggest defaults you can use by pressing enter - and if you
 don't want a directory included, press ctrl+D and it'll forever skip this
 directory when you run make_titles.rb (and not create a .galleruby.yaml). To
 revert this behavior for a directory, delete the .galleruby.skip file.
-    ./make_titles.rb ~/Pictures/Events
+    ./make_titles.rb ~/Pictures/Albums
 
 Second, you just need to run gallerubify - but copy config.yml.dist to
 config.yml and edit it first. Running gallerubify will take some time, as it's
 generating three resized versions of your files for publishing. You can change
 what these sizes are by editing config.yml.
-    ./gallerubify.rb ~/Pictures/Events
+    ./gallerubify.rb ~/Pictures/Albums
 
-Third, you need to put the static directory as 'galleruby' in your output dir:
-    cp -r static output/galleruby
+Third, you need to put the static directory in your output dir:
+    cp -r static output/
 
 Example
 =======
@@ -73,7 +73,7 @@ Here's how you'd get started, assuming the above layout. Notice that defaults
 were accepted for most values except the title of the birthday party album, and
 that we skipped publishing "Very private photos" by pressing ctrl-D.
 
-    $ ./make_titles.rb ~/Pictures/Events
+    $ ./make_titles.rb ~/Pictures/Albums
     > Directory Birthday party 2009, 19 files
        What should the title be? [Birthday party 2009]
     Birthday party!
@@ -89,12 +89,12 @@ that we skipped publishing "Very private photos" by pressing ctrl-D.
     ^D
        Skipping album
 
-    $ ./gallerubify.rb ~/Pictures/Events
+    $ ./gallerubify.rb ~/Pictures/Albums
     Birthday party 2009: Processing album
     Birthday party 2009: Rendering HTML
     Crazy Galleruby release party: Processing album
     Crazy Galleruby release party: Rendering HTML
     All done! Generating index.
 
-    $ cp -r static output/galleruby
+    $ cp -r static output/
     $ s3sync.rb -vrp output/ my_gallery_bucket:
