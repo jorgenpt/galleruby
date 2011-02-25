@@ -12,6 +12,7 @@ You can see an example setup of Galleruby running on Amazon S3 here:
 
 It's not very configurable, and it makes some assumptions that might not be true
 for your picture setup. I'm aware of the following ones:
+
 * All photos need the EXIF DateTime tag set.
 * Files need to have jpg or jpeg as their extension (case insensitive).
 * Your albums are sorted into directories in a common source directory, and albums do not have sub-directories.
