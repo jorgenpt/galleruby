@@ -7,18 +7,19 @@ written to publish my personal photos on Amazon S3. I just run this script then
 s3sync.rb the resulting output to my S3 bucket.
 
 You can see an example setup of Galleruby running on Amazon S3 here:
-http://galleruby.devsoft.no
+
+[http://galleruby.devsoft.no](http://galleruby.devsoft.no)
 
 It's not very configurable, and it makes some assumptions that might not be true
 for your picture setup. I'm aware of the following ones:
- * All photos need the EXIF DateTime tag set.
- * Files need to have jpg or jpeg as their extension (case insensitive).
- * Your albums are sorted into directories in a common source directory, and
-   albums do not have sub-directories.
+* All photos need the EXIF DateTime tag set.
+* Files need to have jpg or jpeg as their extension (case insensitive).
+* Your albums are sorted into directories in a common source directory, and albums do not have sub-directories.
 
 If you remove any of these limitations, or find others, please let me know! :-)
 
-As an example of the layout, this is what http://galleruby.devsoft has locally:
+As an example of the layout, this is what
+[http://galleruby.devsoft.no](http://galleruby.devsoft.no) has locally:
     ~/Pictures/Albums/
         Hiking at Daley Ranch/
             IMG_0832.JPG
