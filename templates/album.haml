@@ -1,9 +1,9 @@
 %html
   %head
+    = include_template 'header'
+
     %title
       = config['title'] + " - " + title
-
-    = include_template 'header'
 
     :javascript
       $(document).ready(function() {
