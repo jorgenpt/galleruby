@@ -257,19 +257,22 @@ class Album
             end
         end
 
-        range_start = first_taken.strftime('%e')
-        if first_taken.year == last_taken.year then
-            if first_taken.month != last_taken.month then
-                range_start << first_taken.strftime('. %b')
-            end
-        else
-            range_start << first_taken.strftime('. %b, %Y')
-        end
-
-        date_range = "#{range_start} - #{last_taken.strftime('%e. %b, %Y')}"
-
         @info['first'] = first_taken
-        @info['date'] = date_range
+        if first_taken.strftime == last_taken.strftime then
+            @info['date'] = first_taken.strftime('%e. %b, %Y')
+        else
+            range_start = first_taken.strftime('%e')
+            if first_taken.year == last_taken.year then
+                if first_taken.month != last_taken.month then
+                    range_start << first_taken.strftime('. %b')
+                end
+            else
+                range_start << first_taken.strftime('. %b, %Y')
+            end
+
+            date_range = "#{range_start} - #{last_taken.strftime('%e. %b, %Y')}"
+            @info['date'] = date_range
+        end
 
         File.open(@settings_file, 'w') { |file| file.write(YAML.dump(@info)) }
 
