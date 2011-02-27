@@ -26,6 +26,25 @@ function slideshow_start(image) {
         $("#slideshow_background").css('z-index', '1');
     });
 
+    $(document).bind('keydown', function(event) {
+        switch (event.keyCode)
+        {
+        case 37: // Left arrow
+            slideshow_prev();
+            break;
+
+        case 32: // Space
+            event.preventDefault();
+        case 39: // Right arrow
+            slideshow_next();
+            break;
+
+        case 27: // Escape
+            slideshow_stop();
+            break;
+        }
+    });
+
     slideshow_show(image);
 }
 
@@ -37,6 +56,7 @@ function slideshow_stop() {
         $(this).css('z-index', '-1');
     });
 
+    $(document).unbind('keydown');
     document.location.hash = '_';
 
     return false;
