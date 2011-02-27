@@ -34,6 +34,36 @@ require 'haml'
 EXIF_DATE_FORMAT = '%Y:%m:%d %H:%M:%S'
 TRACK_ALLOCATIONS = false
 
+# Class to easily instantiate an object when needed.
+# Similar to using (object ||= Foo.new).bar, but stores the initialization code to make
+# the code cleaner.
+class LazyObject
+    @object = nil
+    def initialize(&code)
+        @init = code
+    end
+
+    def was_initialized?
+        not @object.nil?
+    end
+
+    def method_missing(m, *args, &block)
+        if not was_initialized? then
+            @object = @init.call
+            @object.public_methods(false).each do |meth|
+                (class << self; self; end).class_eval do
+                    define_method meth do |*args|
+                        @object.send meth, *args
+                    end
+                end
+            end
+            @object.send m, *args, &block
+        else
+            super.method_missing m, *args, &block
+        end
+    end
+end
+
 class Template
     @@cache = {}
 
@@ -201,11 +231,7 @@ class Album
             medium_filename = "#{output_medium}/#{entry}"
             large_filename = "#{output_large}/#{entry}"
 
-            image = Magick::Image.read(filename).first
-            image.auto_orient!
-
-            taken = image.get_exif_by_entry('DateTime').first[1]
-            taken = Date.strptime(taken, EXIF_DATE_FORMAT)
+            image = LazyObject.new { o = Magick::Image.read(filename).first; o.auto_orient!; o }
 
             if not File.exist? large_filename then
                 new_image = image.resize_to_fit(*config['large'])
@@ -227,6 +253,9 @@ class Album
             else
                 small_image = Magick::Image.ping(small_filename).first
             end
+
+            taken = small_image.get_exif_by_entry('DateTime').first[1]
+            taken = Date.strptime(taken, EXIF_DATE_FORMAT)
 
             if last_taken.nil? then
                 last_taken = taken
@@ -250,7 +279,9 @@ class Album
             }
 
             small_image.destroy!
-            image.destroy!
+            if not image.nil? and (image.is_a?(LazyObject) and image.was_initialized?) then
+                image.destroy!
+            end
 
             if TRACK_ALLOCATIONS and num_allocated > 0 then
                 puts "#{name}: Num allocated: #{num_allocated}"
@@ -259,9 +290,9 @@ class Album
 
         @info['first'] = first_taken
         if first_taken.strftime == last_taken.strftime then
-            @info['date'] = first_taken.strftime('%e. %b, %Y')
+            @info['date'] = first_taken.strftime('%e. %b, %Y').lstrip
         else
-            range_start = first_taken.strftime('%e')
+            range_start = first_taken.strftime('%e').lstrip
             if first_taken.year == last_taken.year then
                 if first_taken.month != last_taken.month then
                     range_start << first_taken.strftime('. %b')
@@ -270,7 +301,7 @@ class Album
                 range_start << first_taken.strftime('. %b, %Y')
             end
 
-            date_range = "#{range_start} - #{last_taken.strftime('%e. %b, %Y')}"
+            date_range = "#{range_start} - #{last_taken.strftime('%e. %b, %Y').lstrip}"
             @info['date'] = date_range
         end
 
