@@ -163,29 +163,6 @@ class TemplateDependencyCalculator < Template
     end
 end
 
-opts = GetoptLong.new(
-    [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
-    [ '--output', '-o', GetoptLong::OPTIONAL_ARGUMENT ],
-    [ '--config', '-c', GetoptLong::OPTIONAL_ARGUMENT ],
-    [ '--force', '-f', GetoptLong::NO_ARGUMENT ]
-)
-
-output_directory = 'output'
-config_file = 'config.yml'
-force_regenerate = false
-opts.each do |opt, arg|
-    case opt
-    when '--help'
-        RDoc::usage
-    when '--output'
-        output_directory = arg
-    when '--config'
-        config_file = arg
-    when '--force'
-        force_regenerate = true
-    end
-end
-
 class Album
     attr_reader :name
 
@@ -401,76 +378,106 @@ class Album
     end
 end
 
-if ARGV.empty? then
-    RDoc::usage
-    exit 1
-end
+def main
+    opts = GetoptLong.new(
+        [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
+        [ '--output', '-o', GetoptLong::OPTIONAL_ARGUMENT ],
+        [ '--config', '-c', GetoptLong::OPTIONAL_ARGUMENT ],
+        [ '--force', '-f', GetoptLong::NO_ARGUMENT ]
+    )
 
-directory = ARGV[0]
-
-# These are default options
-config = {
-    'title' => 'My Gallery',
-    'small' => [320, 256],
-    'medium' => [800, 600],
-    'large' => [1280, 1024]
-}
-config.merge!(YAML::load(File.read(config_file)) || {})
-
-# If we TRACK_ALLOCATIONS, we keep a count of "currently allocated images", so
-# that we can identify memory leaks.
-num_allocated = 0
-if TRACK_ALLOCATIONS then
-    Magick.trace_proc = Proc.new { |which, description, id, method|
-        if which == :c then
-            num_allocated += 1
-        elsif which == :d then
-            num_allocated -= 1
-        else
-            puts "#{which} #{id} #{description} (from #{method})"
+    output_directory = 'output'
+    config_file = 'config.yml'
+    force_regenerate = false
+    opts.each do |opt, arg|
+        case opt
+        when '--help'
+            RDoc::usage
+        when '--output'
+            output_directory = arg
+        when '--config'
+            config_file = arg
+        when '--force'
+            force_regenerate = true
         end
-    }
-end
-
-# This dynamically generates a list of all the HAML templates referenced during
-# a render of album.haml, which we use to figure out if any of them have been
-# modified since last we generated.
-deps = TemplateDependencyCalculator.new('album')
-templates_modified = deps.files.collect { |file|
-    path = deps.template_path(file)
-    File.exist?(path) ? File.mtime(path) : Time.now
-}
-templates_modified = templates_modified.max
-
-# We iterate over each directory inside the directory passed on the commandline,
-# checking if any of them are considered valid albums (have .galleruby.yml etc,
-# see Album#valid?) and regenerate thumbnails & HTML if its needed.
-albums_by_year = Hash.new { |hash, key| hash[key] = [] }
-Dir.new(directory).each do |album|
-    album = Album.new(directory, album)
-
-    next if not album.valid?
-
-    if force_regenerate or album.needs_updating?(output_directory, templates_modified)
-        puts "#{album.name}: Processing album"
-        if not album.process(config, output_directory) then
-            puts "#{album.name}: WARNING! No images to process, skipping"
-            next
-        end
-
-        puts "#{album.name}: Rendering HTML"
-        album.render_to(config, output_directory)
-    else
-        puts "#{album.name}: No update needed, skipping"
     end
 
-    albums_by_year[album.year] << album
+    if ARGV.empty? then
+        RDoc::usage
+        return 1
+    end
+
+    directory = ARGV[0]
+
+    # These are the default options
+    config = {
+        'title' => 'My Gallery',
+        'small' => [320, 256],
+        'medium' => [800, 600],
+        'large' => [1280, 1024]
+    }
+    config.merge!(YAML::load(File.read(config_file)) || {})
+
+    # If we TRACK_ALLOCATIONS, we keep a count of "currently allocated images", so
+    # that we can identify memory leaks.
+    num_allocated = 0
+    if TRACK_ALLOCATIONS then
+        Magick.trace_proc = Proc.new do |which, description, id, method|
+            if which == :c then
+                num_allocated += 1
+            elsif which == :d then
+                num_allocated -= 1
+            else
+                puts "#{which} #{id} #{description} (from #{method})"
+            end
+        end
+    end
+
+    # This dynamically generates a list of all the HAML templates referenced during
+    # a render of album.haml, which we use to figure out if any of them have been
+    # modified since last we generated.
+    deps = TemplateDependencyCalculator.new('album')
+    templates_modified = deps.files.collect { |file|
+        path = deps.template_path(file)
+        File.exist?(path) ? File.mtime(path) : Time.now
+    }
+    templates_modified = templates_modified.max
+
+    # We iterate over each directory inside the directory passed on the commandline,
+    # checking if any of them are considered valid albums (have .galleruby.yml etc,
+    # see Album#valid?) and regenerate thumbnails & HTML if its needed.
+    albums_by_year = Hash.new { |hash, key| hash[key] = [] }
+    Dir.new(directory).each do |album|
+        album = Album.new(directory, album)
+
+        next if not album.valid?
+
+        if force_regenerate or album.needs_updating?(output_directory, templates_modified)
+            puts "#{album.name}: Processing album"
+            if not album.process(config, output_directory) then
+                puts "#{album.name}: WARNING! No images to process, skipping"
+                next
+            end
+
+            puts "#{album.name}: Rendering HTML"
+            album.render_to(config, output_directory)
+        else
+            puts "#{album.name}: No update needed, skipping"
+        end
+
+        albums_by_year[album.year] << album
+    end
+
+    puts "All done! Generating index."
+
+    # Finally we generate the index unconditionally, since it's a really cheap
+    # operation. It's possible that we should not do this unless neeed, so that
+    # index.html's mtime will have some value.
+    albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
+    Template.new('index').render_to("#{output_directory}/index.html", {:config => config, :albums_by_year => albums_by_year}, output_directory)
+
+    return 0
+
+if $0 == __FILE__ then
+    exit main
 end
-
-puts "All done! Generating index."
-
-# Finally we generate the index unconditionally, since it's a really cheap
-# operation. It's possible that we should not do this unless neeed, so that
-# index.html's mtime will have some value.
-albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
-Template.new('index').render_to("#{output_directory}/index.html", {:config => config, :albums_by_year => albums_by_year}, output_directory)
