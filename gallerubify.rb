@@ -68,7 +68,7 @@ class Template
     @@cache = {}
 
     def initialize(file, output_filename=nil, base_directory=nil)
-        file = "templates/#{file}.haml"
+        file = template_path file
         if not @@cache.has_key? file then
             @@cache[file] = Haml::Engine.new(File.read(file))
         end
@@ -77,6 +77,10 @@ class Template
         @locals = {}
         @output_filename = output_filename
         @base_directory = base_directory
+    end
+
+    def template_path(name)
+        "templates/#{name}.haml"
     end
 
     def render_to(filename, locals={}, base=nil)
@@ -107,7 +111,7 @@ class Template
     end
 
     def include_template(file, locals={})
-        template = Template.new(file, @output_filename, @base_directory)
+        template = self.class.new(file, @output_filename, @base_directory)
         template.render(@locals.merge(locals))
     end
 
@@ -122,6 +126,40 @@ class Template
         components << path
 
         return components.join('/')
+    end
+end
+
+class TemplatePlaceholder
+    def method_missing(m, *args, &block)
+        TemplatePlaceholder.new
+    end
+end
+
+class TemplateDependencyCalculator < Template
+    attr_accessor :files
+
+    def initialize(file, output_filename=nil, base_directory=nil)
+        super(file, output_filename, base_directory)
+        @file = file
+        render_to('/dev/null')
+    end
+
+    def render(locals={})
+        @files = Set.new @file
+        super(locals)
+    end
+
+    def include_for_each(file, elements)
+        include_template file
+    end
+
+    def include_template(file, locals={})
+        template = self.class.new(file, @output_filename, @base_directory)
+        @files.add(file).merge(template.files)
+    end
+
+    def method_missing(m, *args, &block)
+        TemplatePlaceholder.new
     end
 end
 
@@ -151,6 +189,7 @@ end
 class Album
     attr_reader :name
 
+    # Album representing the passed in name in the passed in directory.
     def initialize(directory, name)
         @name = name
         @path = "#{directory}/#{name}"
@@ -173,6 +212,9 @@ class Album
         @images_by_date = nil
     end
 
+    # Whether or not the input directory is considered a valid Galleruby album,
+    # i.e. if it has the metadata-file, is not a 'hidden' directory and does not
+    # have a blacklist (.galleruby.skip) file.
     def valid?
         return false if @name.start_with? '.'
         return false if not File.directory? @path
@@ -182,26 +224,46 @@ class Album
         return true
     end
 
-    def needs_updating? output_directory
+    # When the output HTML was last generated.
+    def last_updated output_directory
         output_file = "#{output_directory}/#{@info['link']}/index.html"
         if File.exist? output_file then
-            last_generated = File.mtime output_file
-
-            needs_updating = false
-            Dir.new(@path).each { |entry|
-                next if not entry.match /\.jpe?g$/i
-
-                if last_generated < File.mtime("#{@path}/#{entry}") then
-                    return true
-                end
-            }
-
-            return false
+            File.mtime output_file
+        else
+            Time.at(0)
         end
-
-        return true
     end
 
+    # Whether or not the album needs to update the generated HTML file and
+    # possibly the resized images, based on when the input images were modified
+    # and when the input HAML templates were last modified.
+    def needs_updating?(output_directory, templates_modified)
+        updated = last_updated output_directory
+
+        # If the template is more recent, we need to update.
+        return true if templates_modified > updated
+
+        # If any of the images are more recent, we need to update.
+        Dir.new(@path).each do |entry|
+            next if not entry.match /\.jpe?g$/i
+            return true if updated < File.mtime("#{@path}/#{entry}")
+        end
+
+        return false
+    end
+
+    # Whether or not the passed in filename needs to be generated from its
+    # input, given when the input was last updated.
+    def file_needs_updating?(output_filename, original_mtime)
+        return true if not File.exist? output_filename
+        return true if File.mtime(output_filename) < original_mtime
+
+        return false
+    end
+
+    # Process generates any resized images for the album as needed, and also
+    # generates metadata about the album that's cached in .galleruby.yml inside
+    # the albums source directory
     def process(config, output_directory)
         to_process = []
         Dir.new(@path).each { |entry|
@@ -211,9 +273,7 @@ class Album
             to_process << entry
         }
 
-        if to_process.empty?
-            return false
-        end
+        return false if to_process.empty?
 
         output_album = "#{output_directory}/#{@info['link']}"
         output_small = "#{output_album}/small"
@@ -225,6 +285,10 @@ class Album
         @images_by_date = Hash.new {|hash, key| hash[key] = [] }
         first_taken, last_taken = nil, nil
 
+        # We go over each (loosely defined) valid image in the directory, and
+        # generate any small, medium or large thumbnails needed. In addition, we
+        # find the range of the EXIF DateTime header for the album, so that we
+        # can store that as metadata for the album.
         to_process.each do |entry|
             filename = "#{@path}/#{entry}"
             small_filename = "#{output_small}/#{entry}"
@@ -232,8 +296,9 @@ class Album
             large_filename = "#{output_large}/#{entry}"
 
             image = LazyObject.new { o = Magick::Image.read(filename).first; o.auto_orient!; o }
+            original_mtime = File.mtime filename
 
-            if not File.exist? large_filename then
+            if file_needs_updating?(large_filename, original_mtime) then
                 new_image = image.resize_to_fit(*config['large'])
                 new_image.write(large_filename)
                 image.destroy!
@@ -241,13 +306,13 @@ class Album
                 image = new_image
             end
 
-            if not File.exist? medium_filename then
+            if file_needs_updating?(medium_filename, original_mtime) then
                 medium_image = image.resize_to_fit(*config['medium'])
                 medium_image.write(medium_filename)
                 medium_image.destroy!
             end
 
-            if not File.exist? small_filename then
+            if file_needs_updating?(small_filename, original_mtime) then
                 small_image = image.resize_to_fit(*config['small'])
                 small_image.write(small_filename)
             else
@@ -305,11 +370,14 @@ class Album
             @info['date'] = date_range
         end
 
+        # Here we write out the original metadata + the EXIF date range we've
+        # identified.
         File.open(@settings_file, 'w') { |file| file.write(YAML.dump(@info)) }
 
         return true
     end
 
+    # Create a HTML-file for the album.
     def render_to(config, output_directory)
         images_by_date = @images_by_date.sort.map do |day, images|
             {
@@ -322,10 +390,12 @@ class Album
         Template.new('album').render_to(output_file, {:config => config, :title => @info['title'], :images_by_date => images_by_date}, output_directory)
     end
 
+    # The year that the first photo was taken in.
     def year
         @info['first'].strftime('%Y')
     end
 
+    # Data needed for generation of the index document.
     def template_info
         {:name => @info['title'], :link => @info['link'], :date => @info['date'], :first => @info['first']}
     end
@@ -347,34 +417,49 @@ config = {
 }
 config.merge!(YAML::load(File.read(config_file)) || {})
 
+# If we TRACK_ALLOCATIONS, we keep a count of "currently allocated images", so
+# that we can identify memory leaks.
 num_allocated = 0
 if TRACK_ALLOCATIONS then
     Magick.trace_proc = Proc.new { |which, description, id, method|
         if which == :c then
             num_allocated += 1
-            #puts "+ #{id} #{description} (from #{method})"
         elsif which == :d then
             num_allocated -= 1
-            #puts "- #{id} #{description} (from #{method})"
+        else
+            puts "#{which} #{id} #{description} (from #{method})"
         end
     }
 end
 
+# This dynamically generates a list of all the HAML templates referenced during
+# a render of album.haml, which we use to figure out if any of them have been
+# modified since last we generated.
+deps = TemplateDependencyCalculator.new('album')
+templates_modified = deps.files.collect { |file|
+    path = deps.template_path(file)
+    File.exist?(path) ? File.mtime(path) : Time.now
+}
+templates_modified = templates_modified.max
+
+# We iterate over each directory inside the directory passed on the commandline,
+# checking if any of them are considered valid albums (have .galleruby.yml etc,
+# see Album#valid?) and regenerate thumbnails & HTML if its needed.
 albums_by_year = Hash.new { |hash, key| hash[key] = [] }
 Dir.new(directory).each do |album|
     album = Album.new(directory, album)
 
     next if not album.valid?
 
-    if force_regenerate or album.needs_updating? output_directory
+    if force_regenerate or album.needs_updating?(output_directory, templates_modified)
         puts "#{album.name}: Processing album"
-        if not album.process config, output_directory then
+        if not album.process(config, output_directory) then
             puts "#{album.name}: WARNING! No images to process, skipping"
             next
         end
 
         puts "#{album.name}: Rendering HTML"
-        album.render_to config, output_directory
+        album.render_to(config, output_directory)
     else
         puts "#{album.name}: No update needed, skipping"
     end
@@ -384,7 +469,8 @@ end
 
 puts "All done! Generating index."
 
-years_content = []
+# Finally we generate the index unconditionally, since it's a really cheap
+# operation. It's possible that we should not do this unless neeed, so that
+# index.html's mtime will have some value.
 albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
-
 Template.new('index').render_to("#{output_directory}/index.html", {:config => config, :albums_by_year => albums_by_year}, output_directory)
