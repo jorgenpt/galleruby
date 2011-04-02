@@ -477,6 +477,7 @@ def main
     Template.new('index').render_to("#{output_directory}/index.html", {:config => config, :albums_by_year => albums_by_year}, output_directory)
 
     return 0
+end
 
 if $0 == __FILE__ then
     exit main
