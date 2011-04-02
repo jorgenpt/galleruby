@@ -297,7 +297,7 @@ class Album
             end
 
             taken = small_image.get_exif_by_entry('DateTime').first[1]
-            taken = Date.strptime(taken, EXIF_DATE_FORMAT)
+            taken = DateTime.strptime(taken, EXIF_DATE_FORMAT)
 
             if last_taken.nil? then
                 last_taken = taken
@@ -311,7 +311,7 @@ class Album
                 first_taken = taken if taken < first_taken
             end
 
-            @images_by_date[taken.strftime] << {
+            @images_by_date[taken.strftime('%F')] << {
                 :taken => taken,
                 :data => {
                     :filename => entry,
