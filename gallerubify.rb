@@ -315,7 +315,7 @@ class Album
                 thumb_image = Magick::Image.ping(thumb_filename).first
             end
 
-            taken = thumb_image.get_exif_by_entry('DateTime').first[1]
+            taken = thumb_image.get_exif_by_entry('DateTimeOriginal').first[1]
             taken = DateTime.strptime(taken, EXIF_DATE_FORMAT)
 
             if last_taken.nil? then
