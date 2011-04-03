@@ -27,10 +27,24 @@ require 'yaml'
 require 'getoptlong'
 require 'rdoc/usage'
 require 'set'
+require 'date'
 
-require 'rubygems'
+require 'rubygems' rescue nil
+
 require 'RMagick'
 require 'haml'
+
+class Time
+  def to_datetime
+    # Convert seconds + microseconds into a fractional number of seconds
+    seconds = sec + Rational(usec, 10**6)
+
+    # Convert a UTC offset measured in minutes to one measured in a
+    # fraction of a day.
+    offset = Rational(utc_offset, 60 * 60 * 24)
+    DateTime.new(year, month, day, hour, min, seconds, offset)
+  end
+end
 
 EXIF_DATE_FORMAT = '%Y:%m:%d %H:%M:%S'
 TRACK_ALLOCATIONS = false
@@ -183,6 +197,8 @@ class Album
 
         if valid? then
             @info = YAML::load(File.read(@settings_file))
+            # YAML serializes DateTime as Time, so we convert back.
+            @info['first'] = @info['first'].to_datetime if @info.has_key?('first')
         end
 
         @info ||= {}
