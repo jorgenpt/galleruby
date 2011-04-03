@@ -350,7 +350,7 @@ class Album
         end
 
         @info['first'] = first_taken
-        if first_taken.strftime == last_taken.strftime then
+        if first_taken.strftime('%F') == last_taken.strftime('%F') then
             @info['date'] = first_taken.strftime('%e. %b, %Y').lstrip
         else
             range_start = first_taken.strftime('%e').lstrip
