@@ -26,6 +26,7 @@ require 'ftools'
 require 'yaml'
 require 'getoptlong'
 require 'rdoc/usage'
+require 'set'
 
 require 'rubygems'
 require 'RMagick'
@@ -372,6 +373,10 @@ class Album
         @info['first'].strftime('%Y')
     end
 
+    def link
+      @info['link']
+    end
+
     # Data needed for generation of the index document.
     def template_info
         {:name => @info['title'], :link => @info['link'], :date => @info['date'], :first => @info['first']}
@@ -443,6 +448,8 @@ def main
     }
     templates_modified = templates_modified.max
 
+    encountered_links = {}
+
     # We iterate over each directory inside the directory passed on the commandline,
     # checking if any of them are considered valid albums (have .galleruby.yml etc,
     # see Album#valid?) and regenerate thumbnails & HTML if its needed.
@@ -452,7 +459,14 @@ def main
 
         next if not album.valid?
 
-        if force_regenerate or album.needs_updating?(output_directory, templates_modified)
+        if encountered_links.has_key?(album.link) then
+          puts "#{album.name}: WARNING! This album has the same link name as '#{encountered_links[album.link]}', skipping."
+          next
+        end
+
+        encountered_links[album.link] = album.name
+
+        if force_regenerate or album.needs_updating?(output_directory, templates_modified) then
             puts "#{album.name}: Processing album"
             if not album.process(config, output_directory) then
                 puts "#{album.name}: WARNING! No images to process, skipping"
