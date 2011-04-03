@@ -80,8 +80,10 @@ function slideshow_show(image) {
     }
 
     current_image = image;
-    $("#slideshow_image").attr('src', image_dir + "/" + images[image]);
+    $("#slideshow_image").attr('src', image_dir + '/' + images[image]);
     document.location.hash = 'slideshow=' + current_image;
+
+    $("#slideshow_fullsize_link").attr('href', 'large/' + images[image]);
 
     if (image >= images.length - 1)
         $("#slideshow_next").hide();

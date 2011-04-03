@@ -41,7 +41,7 @@ img {
   border: 1px solid gray;
 }
 
-#slideshow_close, #slideshow_prev, #slideshow_next {
+#slideshow_close, #slideshow_prev, #slideshow_next, #slideshow_fullsize {
   position: absolute;
 }
 
@@ -59,3 +59,15 @@ img {
   right: 5px;
   bottom: 5px;
 }
+
+#slideshow_fullsize {
+  text-align: center;
+  left: 0px;
+  bottom: 1em;
+  width: 100%;
+}
+
+#slideshow_fullsize a:link { color: #ebebeb; }
+#slideshow_fullsize a:visited { color: #ebebeb; }
+#slideshow_fullsize a:active { color: #c0c0c0; }
+#slideshow_fullsize a:hover { color: #ffffff; }
