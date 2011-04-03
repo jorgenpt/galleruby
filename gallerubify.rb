@@ -252,6 +252,8 @@ class Album
         return true if not File.exist? output_filename
         return true if File.mtime(output_filename) < original_mtime
 
+        # TODO: Check for 'first' etc in @info.
+
         return false
     end
 
@@ -270,22 +272,22 @@ class Album
         return false if to_process.empty?
 
         output_album = "#{output_directory}/#{@info['link']}"
-        output_small = "#{output_album}/small"
+        output_thumb = "#{output_album}/small"
         output_medium = "#{output_album}/medium"
         output_large = "#{output_album}/large"
 
-        File.makedirs output_small, output_medium, output_large
+        File.makedirs(output_thumb, output_medium, output_large)
 
         @images_by_date = Hash.new {|hash, key| hash[key] = [] }
         first_taken, last_taken = nil, nil
 
         # We go over each (loosely defined) valid image in the directory, and
-        # generate any small, medium or large thumbnails needed. In addition, we
+        # generate any thumbnail, medium or large versions needed. In addition, we
         # find the range of the EXIF DateTime header for the album, so that we
         # can store that as metadata for the album.
         to_process.each do |entry|
             filename = "#{@path}/#{entry}"
-            small_filename = "#{output_small}/#{entry}"
+            thumb_filename = "#{output_thumb}/#{entry}"
             medium_filename = "#{output_medium}/#{entry}"
             large_filename = "#{output_large}/#{entry}"
 
@@ -306,14 +308,14 @@ class Album
                 medium_image.destroy!
             end
 
-            if file_needs_updating?(small_filename, original_mtime) then
-                small_image = image.resize_to_fit(*config['small'])
-                small_image.write(small_filename)
+            if file_needs_updating?(thumb_filename, original_mtime) then
+                thumb_image = image.resize_to_fit(*config['thumb'])
+                thumb_image.write(thumb_filename)
             else
-                small_image = Magick::Image.ping(small_filename).first
+                thumb_image = Magick::Image.ping(thumb_filename).first
             end
 
-            taken = small_image.get_exif_by_entry('DateTime').first[1]
+            taken = thumb_image.get_exif_by_entry('DateTime').first[1]
             taken = DateTime.strptime(taken, EXIF_DATE_FORMAT)
 
             if last_taken.nil? then
@@ -332,12 +334,12 @@ class Album
                 :taken => taken,
                 :data => {
                     :filename => entry,
-                    :thumb_width => small_image.columns,
-                    :thumb_height => small_image.rows
+                    :thumb_width => thumb_image.columns,
+                    :thumb_height => thumb_image.rows
                 }
             }
 
-            small_image.destroy!
+            thumb_image.destroy!
             if not image.nil? and (image.is_a?(LazyObject) and image.was_initialized?) then
                 image.destroy!
             end
@@ -433,7 +435,7 @@ def main
     # These are the default options
     config = {
         'title' => 'My Gallery',
-        'small' => [320, 256],
+        'thumb' => [320, 256],
         'medium' => [800, 600],
         'large' => [1280, 1024]
     }
