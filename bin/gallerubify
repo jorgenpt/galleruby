@@ -2,11 +2,11 @@
 #
 # == Synposis
 #
-# generate.rb: generates gallery from directories
+# gallerubify.rb: generates gallery from directories
 #
 # == Usage
 #
-# generate.rb [OPTION] ... DIR
+# gallerubify.rb [OPTION] ... DIR
 #
 # -h, --help:
 #   show help
@@ -19,6 +19,9 @@
 #
 # -f, --force
 #   forces regeneration of HTML files even if we think they album is unchanged.
+#
+# -v, --verbose
+#   gives verbose status information
 #
 # DIR: The directory to look for input albums in.
 
@@ -33,12 +36,14 @@ def main
         [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
         [ '--output', '-o', GetoptLong::OPTIONAL_ARGUMENT ],
         [ '--config', '-c', GetoptLong::OPTIONAL_ARGUMENT ],
-        [ '--force', '-f', GetoptLong::NO_ARGUMENT ]
+        [ '--force', '-f', GetoptLong::NO_ARGUMENT ],
+        [ '--verbose', '-v', GetoptLong::NO_ARGUMENT ]
     )
 
     output_directory = 'output'
     config_file = 'config.yml'
-    force_regenerate = false
+    force_regenerate = verbose = false
+
     opts.each do |opt, arg|
         case opt
         when '--help'
@@ -49,6 +54,8 @@ def main
             config_file = arg
         when '--force'
             force_regenerate = true
+        when '--verbose'
+            verbose = true
         end
     end
 
@@ -67,6 +74,16 @@ def main
         'large' => [1280, 1024]
     }
     config.merge!(YAML::load(File.read(config_file)) || {})
+
+    # We make sure to copy all the static resources.
+    puts "Copying static resources to output."
+    Dir["static/*"].each do |path|
+      output_path = "#{output_directory}/#{path}"
+      File.copy(path, output_path)
+      puts "cp #{path} #{output_path}" if verbose
+    end
+
+    puts "Done! Enumerating albums."
 
     # This dynamically generates a list of all the HAML templates referenced during
     # a render of album.haml, which we use to figure out if any of them have been
