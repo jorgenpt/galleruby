@@ -1,9 +1,9 @@
 %meta{'http-equiv' => 'Content-Type', :content => 'text/html; charset=UTF-8'}
 
 :javascript
-  var thumb_dimensions = #{config['thumb'].inspect};
-  var medium_dimensions = #{config['medium'].inspect};
-  var large_dimensions = #{config['large'].inspect};
+  var thumb_dimensions = #{config[:thumb].inspect};
+  var medium_dimensions = #{config[:medium].inspect};
+  var large_dimensions = #{config[:large].inspect};
 
 %script{:type => 'text/javascript', :src => base_relative("static/jquery-1.5.min.js")}
 %script{:type => 'text/javascript', :src => base_relative("static/galleruby.js")}

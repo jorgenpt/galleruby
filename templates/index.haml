@@ -3,11 +3,11 @@
     = include_template 'header'
 
     %title
-      = config['title']
+      = config[:title]
 
   %body.album_index
     %h1
-      = config['title']
+      = config[:title]
 
     #albums
       = include_for_each 'index.per_year', albums_by_year

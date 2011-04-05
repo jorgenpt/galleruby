@@ -20,16 +20,17 @@ module Galleruby
       end
 
       def template_path(name)
-          "#{@config['templates']}/#{name}.haml"
+          "#{@config[:templates]}/#{name}.haml"
       end
 
       def render_to(filename, locals={}, base=nil)
           @output_filename = filename
           @base_directory = base
 
-          File.open(filename, 'w') { |file|
-              file.write(render(locals))
-          }
+          content = render(locals)
+          File.open(filename, 'w') do |file|
+              file.write(content)
+          end
 
           @base_directory = nil
           @output_filename = nil
@@ -41,7 +42,7 @@ module Galleruby
           end
 
           @locals = locals
-          @locals['config'] = @config
+          @locals[:config] = @config
 
           @engine.render(self, @locals)
       end
@@ -87,7 +88,7 @@ module Galleruby
       end
 
       def render(locals={})
-          @files = Set.new @file
+          @files = Set[@file]
           @engine.render(self)
       end
 
@@ -97,7 +98,7 @@ module Galleruby
 
       def include_template(file, locals={})
           template = self.class.new(file, @config, @output_filename, @base_directory)
-          @files.add(file).merge(template.files)
+          (@files << file).merge(template.files)
       end
 
       def method_missing(m, *args, &block)

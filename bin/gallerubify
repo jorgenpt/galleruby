@@ -1,88 +1,106 @@
 #!/usr/bin/env ruby
-#
-# == Synposis
-#
-# gallerubify.rb: generates gallery from directories
-#
-# == Usage
-#
-# gallerubify.rb [OPTION] ... DIR
-#
-# -h, --help:
-#   show help
-#
-# -o <out>, --output <out>:
-#   generates output gallery in <out> instead of the default output/
-#
-# -c <config>, --config <config>:
-#   reads configuration options from <config> instead of config.yml
-#
-# -f, --force
-#   forces regeneration of HTML files even if we think they album is unchanged.
-#
-# -v, --verbose
-#   gives verbose status information
-#
-# DIR: The directory to look for input albums in.
 
+require 'fileutils'
 require 'yaml'
-require 'getoptlong'
-require 'rdoc/usage'
+require 'optparse'
 
 require 'galleruby'
 
 def main
-    opts = GetoptLong.new(
-        [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
-        [ '--output', '-o', GetoptLong::OPTIONAL_ARGUMENT ],
-        [ '--config', '-c', GetoptLong::OPTIONAL_ARGUMENT ],
-        [ '--force', '-f', GetoptLong::NO_ARGUMENT ],
-        [ '--verbose', '-v', GetoptLong::NO_ARGUMENT ]
-    )
+    # These are the default options
+    default_config = {
+        :title => 'My Gallery',
+        :thumb => [320, 256],
+        :medium => [800, 600],
+        :large => [1280, 1024],
+        :templates => "#{File.dirname(__FILE__)}/../templates",
+        :static => "#{File.dirname(__FILE__)}/../static",
+        :output => 'output',
+        :verbose => false,
+        :force => false
+    }
 
-    output_directory = 'output'
-    config_file = 'config.yml'
-    force_regenerate = verbose = false
+    config_file = nil
+    config = {}
+    parser = OptionParser.new do |opts|
+      opts.banner = "Usage: gallerubify [OPTION] ... DIR"
+      opts.program_name = 'gallerubify'
+      opts.version = Galleruby::VERSION
 
-    opts.each do |opt, arg|
-        case opt
-        when '--help'
-            RDoc::usage
-        when '--output'
-            output_directory = arg
-        when '--config'
-            config_file = arg
-        when '--force'
-            force_regenerate = true
-        when '--verbose'
-            verbose = true
-        end
+      opts.on("-c", "--config FILE", "Read configuration options from FILE.") do |c|
+        config_file = c
+      end
+
+      opts.on("-o", "--output DIRECTORY", "Generates output gallery in DIRECTORY instead of the default 'output'") do |d|
+        config[:output] = d
+      end
+
+      opts.on("-t", "--title TITLE", "Set gallery title to TITLE") do |t|
+        config[:title] = t
+      end
+
+      opts.on("--templates DIRECTORY", "Read templates from DIRECTORY.") do |d|
+        config[:templates] = d
+      end
+
+      opts.on("-s", "--static DIRECTORY", "Read static files from DIRECTORY.") do |d|
+        config[:static] = d
+      end
+
+      opts.on("-f", "--[no-]force", "Force regeneration of HTML.") do |f|
+        config[:force] = f
+      end
+
+      opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
+        config[:verbose] = v
+      end
+
+      opts.on_tail("-h", "--help", "Show this message") do
+        puts opts
+        return 0
+      end
+
+      opts.on_tail("--version", "Show version") do
+        puts opts.ver
+        return 0
+      end
+    end
+
+    begin
+      parser.parse!
+    rescue OptionParser::ParseError
+      parser.warn $!
+      return 1
     end
 
     if ARGV.empty? then
-        RDoc::usage
-        return 1
+      puts parser
+      return 1
     end
 
     directory = ARGV[0]
 
-    # These are the default options
-    config = {
-        'title' => 'My Gallery',
-        'thumb' => [320, 256],
-        'medium' => [800, 600],
-        'large' => [1280, 1024],
-        'templates' => "#{File.dirname(__FILE__)}/../templates",
-        'static_files' => "#{File.dirname(__FILE__)}/../static",
-    }
-    config.merge!(YAML::load(File.read(config_file)) || {})
+    if not config_file.nil? then
+      loaded_config = YAML.load(File.read(config_file)) || {}
+      loaded_config.keys.each do |key|
+        loaded_config[key.to_sym] = loaded_config[key]
+        loaded_config.delete(key)
+      end
+    else
+      loaded_config = {}
+    end
+
+    # This sets the right order of precedence of default config, config file and
+    # command-line options. Commandline options are the most important, then
+    # loaded options, and at last it falls back to the default config.
+    config = default_config.merge(loaded_config.merge(config))
 
     # We make sure to copy all the static resources.
     puts "Copying static resources to output."
-    Dir["#{config['static_files']}/*"].each do |path|
-      output_path = "#{output_directory}/static/#{File.basename(path)}"
-      File.copy(path, output_path)
-      puts "cp #{path} #{output_path}" if verbose
+    Dir["#{config[:static]}/*"].each do |path|
+      output_path = "#{config[:output]}/static/#{File.basename(path)}"
+      FileUtils.cp(path, output_path)
+      puts "cp #{path} #{output_path}" if config[:verbose]
     end
 
     puts "Done! Enumerating albums."
@@ -115,15 +133,15 @@ def main
 
         encountered_links[album.link] = album.name
 
-        if force_regenerate or album.needs_updating?(output_directory, templates_modified) then
+        if config[:force] or album.needs_updating?(config[:output], templates_modified) then
             puts "#{album.name}: Processing album"
-            if not album.process(config, output_directory) then
+            if not album.process(config, config[:output]) then
                 puts "#{album.name}: WARNING! No images to process, skipping"
                 next
             end
 
             puts "#{album.name}: Rendering HTML"
-            album.render_to(config, output_directory)
+            album.render_to(config, config[:output])
         else
             puts "#{album.name}: No update needed, skipping"
         end
@@ -137,7 +155,7 @@ def main
     # operation. It's possible that we should not do this unless neeed, so that
     # index.html's mtime will have some value.
     albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
-    Galleruby::Template.new('index', config).render_to("#{output_directory}/index.html", {:albums_by_year => albums_by_year}, output_directory)
+    Galleruby::Template.new('index', config).render_to("#{config[:output]}/index.html", {:albums_by_year => albums_by_year}, config[:output])
 
     return 0
 end

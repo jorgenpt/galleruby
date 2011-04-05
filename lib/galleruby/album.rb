@@ -1,4 +1,4 @@
-require 'ftools'
+require 'fileutils'
 require 'yaml'
 require 'rmagick'
 
@@ -104,7 +104,7 @@ module Galleruby
           output_medium = "#{output_album}/medium"
           output_large = "#{output_album}/large"
 
-          File.makedirs(output_thumb, output_medium, output_large)
+          FileUtils.mkdir_p [output_thumb, output_medium, output_large]
 
           @images_by_date = Hash.new {|hash, key| hash[key] = [] }
           first_taken, last_taken = nil, nil
@@ -123,7 +123,7 @@ module Galleruby
               original_mtime = File.mtime filename
 
               if file_needs_updating?(large_filename, original_mtime) then
-                  new_image = image.resize_to_fit(*config['large'])
+                  new_image = image.resize_to_fit(*config[:large])
                   new_image.write(large_filename)
                   image.destroy!
 
@@ -131,13 +131,13 @@ module Galleruby
               end
 
               if file_needs_updating?(medium_filename, original_mtime) then
-                  medium_image = image.resize_to_fit(*config['medium'])
+                  medium_image = image.resize_to_fit(*config[:medium])
                   medium_image.write(medium_filename)
                   medium_image.destroy!
               end
 
               if file_needs_updating?(thumb_filename, original_mtime) then
-                  thumb_image = image.resize_to_fit(*config['thumb'])
+                  thumb_image = image.resize_to_fit(*config[:thumb])
                   thumb_image.write(thumb_filename)
               else
                   thumb_image = Magick::Image.ping(thumb_filename).first
