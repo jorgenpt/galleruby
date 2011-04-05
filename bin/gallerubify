@@ -137,7 +137,7 @@ def main
     # operation. It's possible that we should not do this unless neeed, so that
     # index.html's mtime will have some value.
     albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
-    Galleruby::Template.new('index', config).render_to("#{output_directory}/index.html", {:config => config, :albums_by_year => albums_by_year}, output_directory)
+    Galleruby::Template.new('index', config).render_to("#{output_directory}/index.html", {:albums_by_year => albums_by_year}, output_directory)
 
     return 0
 end

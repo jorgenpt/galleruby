@@ -41,7 +41,9 @@ module Galleruby
           end
 
           @locals = locals
-          @engine.render(self, locals)
+          @locals['config'] = @config
+
+          @engine.render(self, @locals)
       end
 
       def include_for_each(file, elements)
@@ -86,7 +88,7 @@ module Galleruby
 
       def render(locals={})
           @files = Set.new @file
-          super(locals)
+          @engine.render(self)
       end
 
       def include_for_each(file, elements)

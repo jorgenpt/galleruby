@@ -211,7 +211,7 @@ module Galleruby
           end
 
           output_file = "#{output_directory}/#{@info['link']}/index.html"
-          Template.new('album', config).render_to(output_file, {:config => config, :title => @info['title'], :images_by_date => images_by_date}, output_directory)
+          Template.new('album', config).render_to(output_file, {:title => @info['title'], :images_by_date => images_by_date}, output_directory)
       end
 
       # The year that the first photo was taken in.
