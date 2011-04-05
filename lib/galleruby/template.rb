@@ -5,7 +5,9 @@ module Galleruby
   class Template
       @@cache = {}
 
-      def initialize(file, output_filename=nil, base_directory=nil)
+      def initialize(file, config, output_filename=nil, base_directory=nil)
+          @config = config
+
           file = template_path file
           if not @@cache.has_key? file then
               @@cache[file] = Haml::Engine.new(File.read(file))
@@ -18,7 +20,7 @@ module Galleruby
       end
 
       def template_path(name)
-          "templates/#{name}.haml"
+          "#{@config['templates']}/#{name}.haml"
       end
 
       def render_to(filename, locals={}, base=nil)
@@ -49,7 +51,7 @@ module Galleruby
       end
 
       def include_template(file, locals={})
-          template = self.class.new(file, @output_filename, @base_directory)
+          template = self.class.new(file, @config, @output_filename, @base_directory)
           template.render(@locals.merge(locals))
       end
 
@@ -76,8 +78,8 @@ module Galleruby
   class TemplateDependencyCalculator < Template
       attr_accessor :files
 
-      def initialize(file, output_filename=nil, base_directory=nil)
-          super(file, output_filename, base_directory)
+      def initialize(file, config, output_filename=nil, base_directory=nil)
+          super(file, config, output_filename, base_directory)
           @file = file
           render_to('/dev/null')
       end
@@ -92,7 +94,7 @@ module Galleruby
       end
 
       def include_template(file, locals={})
-          template = self.class.new(file, @output_filename, @base_directory)
+          template = self.class.new(file, @config, @output_filename, @base_directory)
           @files.add(file).merge(template.files)
       end
 
