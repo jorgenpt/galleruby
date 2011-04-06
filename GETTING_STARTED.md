@@ -57,4 +57,4 @@ that we skipped publishing "Very private photos" by pressing ctrl-D.
 
     $ s3sync.rb -vrp output/ my_gallery_bucket:
 
-[install]: /jorgenpt/galleruby/INSTALLING.md
+[install]: /jorgenpt/galleruby/blob/master/INSTALLING.md

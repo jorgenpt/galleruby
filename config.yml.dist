@@ -1,4 +1,16 @@
 title: Cool Joe's Gallery
-thumb: [320, 256]
-medium: [800, 600]
-large: [1280, 1024]
+
+# Anything set on the commandline, except for config and the two extract
+# commands, can be set in the config. See galleruby --help for documentation on
+# these options.
+#
+# Here's a list of the values:
+#
+# thumb: [320, 256]
+# medium: [800, 600]
+# large: [1280, 1024]
+# templates: "/some/path/inside/the/gem/templates"
+# static-files: "/some/path/inside/the/gem/static"
+# output: output
+# verbose: false
+# force: false

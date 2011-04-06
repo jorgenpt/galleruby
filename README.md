@@ -1,8 +1,8 @@
-Galleruby
-=========
-
 * For help installing Galleruby, see [the installation guide][installing].
 * To see how to run Galleruby, see [the usage guide][guide].
+
+Galleruby
+=========
 
 Galleruby is a simple Ruby script to automatically generate a static HTML
 gallery (series of different albums) for your local photo collection. It's
@@ -49,5 +49,5 @@ Galleruby isn't very user-friendly, but it gets the job done for me - and maybe
 it'll get the job done for you too! (or maybe some day grow into something more
 general, if I get some user feedback)
 
-[guide]: /jorgenpt/galleruby/GETTING_STARTED.md
-[installing]: /jorgenpt/galleruby/INSTALLING.md
+[guide]: /jorgenpt/galleruby/blob/master/GETTING_STARTED.md
+[installing]: /jorgenpt/galleruby/blob/master/INSTALLING.md
