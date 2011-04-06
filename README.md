@@ -49,5 +49,5 @@ Galleruby isn't very user-friendly, but it gets the job done for me - and maybe
 it'll get the job done for you too! (or maybe some day grow into something more
 general, if I get some user feedback)
 
-[guide]: GETTING_STARTED.md
-[installing]: INSTALLING.md
+[guide]: /jorgenpt/galleruby/GETTING_STARTED.md
+[installing]: /jorgenpt/galleruby/INSTALLING.md

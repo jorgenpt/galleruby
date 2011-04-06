@@ -47,4 +47,4 @@ see how to generate your very own gallery!
 [magick-installer]: https://github.com/maddox/magick-installer
 [homebrew]: https://github.com/mxcl/homebrew
 [rubygems]: http://www.rubygems.org/
-[guide]: GETTING_STARTED.md
+[guide]: /jorgenpt/galleruby/GETTING_STARTED.md
