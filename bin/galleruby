@@ -6,6 +6,21 @@ require 'optparse'
 
 require 'galleruby'
 
+def extract_files(from, to)
+  FileUtils.mkdir_p(to)
+  Dir["#{from}/*"].each do |path|
+    output_path = "#{to}/#{File.basename(path)}"
+    if File.exist? output_path then
+      puts "File already exists: '#{output_path}'"
+      puts "Refusing to overwrite. Delete the file if you want to overwrite it."
+      next
+    end
+
+    puts "cp #{path} #{output_path}"
+    FileUtils.cp(path, output_path)
+  end
+end
+
 def main
     # These are the default options
     default_config = {
@@ -14,7 +29,7 @@ def main
         :medium => [800, 600],
         :large => [1280, 1024],
         :templates => "#{File.dirname(__FILE__)}/../templates",
-        :static => "#{File.dirname(__FILE__)}/../static",
+        :static_files => "#{File.dirname(__FILE__)}/../static",
         :output => 'output',
         :verbose => false,
         :force => false
@@ -43,8 +58,8 @@ def main
         config[:templates] = d
       end
 
-      opts.on("-s", "--static DIRECTORY", "Read static files from DIRECTORY.") do |d|
-        config[:static] = d
+      opts.on("-s", "--static-files DIRECTORY", "Read static files from DIRECTORY.") do |d|
+        config[:static_files] = d
       end
 
       opts.on("-f", "--[no-]force", "Force regeneration of HTML.") do |f|
@@ -54,6 +69,38 @@ def main
       opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
         config[:verbose] = v
       end
+
+      opts.separator("")
+      opts.separator("The following options ignore every other option passed in.")
+
+      opts.on("--create-config", "Create a sample config.yml you can edit.") do |v|
+        if File.exist? 'config.yml' then
+          puts "File already exists: 'config.yml'"
+          puts "Refusing to overwrite. Delete the file if you want to overwrite it."
+          return 1
+        end
+
+        FileUtils.cp("#{File.dirname(__FILE__)}/../config.yml.dist", "config.yml")
+
+        puts "Wrote configuration to config.yml."
+        puts "Edit it, and then run galleruby -c config.yml to use the settings."
+
+        return 0
+      end
+
+      opts.on("--extract-static-files", "Extract static files (CSS, JS, images) from the Gem into a directory named 'static'") do |v|
+        puts "Copying static resources."
+        extract_files(default_config[:static_files], 'static')
+        return 0
+      end
+
+      opts.on("--extract-templates", "Extract HAML templates from the Gem into a directory named 'templates'") do |v|
+        puts "Copying templates."
+        extract_files(default_config[:templates], 'templates')
+        return 0
+      end
+
+      opts.separator("")
 
       opts.on_tail("-h", "--help", "Show this message") do
         puts opts
@@ -83,7 +130,7 @@ def main
     if not config_file.nil? then
       loaded_config = YAML.load(File.read(config_file)) || {}
       loaded_config.keys.each do |key|
-        loaded_config[key.to_sym] = loaded_config[key]
+        loaded_config[key.gsub(/-/, '_').to_sym] = loaded_config[key] unless key.is_a? Symbol
         loaded_config.delete(key)
       end
     else
@@ -97,10 +144,10 @@ def main
 
     # We make sure to copy all the static resources.
     puts "Copying static resources to output."
-    Dir["#{config[:static]}/*"].each do |path|
+    Dir["#{config[:static_files]}/*"].each do |path|
       output_path = "#{config[:output]}/static/#{File.basename(path)}"
-      FileUtils.cp(path, output_path)
       puts "cp #{path} #{output_path}" if config[:verbose]
+      FileUtils.cp(path, output_path)
     end
 
     puts "Done! Enumerating albums."
