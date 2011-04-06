@@ -1,6 +1,9 @@
 Galleruby
 =========
 
+* For help installing Galleruby, see [the installation guide][installing].
+* To see how to run Galleruby, see [the usage guide][guide].
+
 Galleruby is a simple Ruby script to automatically generate a static HTML
 gallery (series of different albums) for your local photo collection. It's
 written to publish my personal photos on Amazon S3. I just run this script then
@@ -46,79 +49,5 @@ Galleruby isn't very user-friendly, but it gets the job done for me - and maybe
 it'll get the job done for you too! (or maybe some day grow into something more
 general, if I get some user feedback)
 
-Dependencies
-============
-
-Galleruby has two external gem dependencies:
-
-* RMagick
-* HAML
-
-You can install these using:
-    gem install rmagick haml
-
-Using Galleruby
-===============
-
-First, Galleruby identifies albums eligible for upload by looking for a
-.galleruby.yml file in the album directory. This file is expected to initially
-contain the user-displayed title of the album (e.g. "Birthday party!") and the
-shortname of the album, which is what the server-side output directory will be
-called (e.g.  "birthdayparty").
-
-So, to get started, you need to generate these files using the make_titles.rb
-script. It will suggest defaults you can use by pressing enter - and if you
-don't want a directory included, press ctrl+D and it'll forever skip this
-directory when you run make_titles.rb (and not create a .galleruby.yml). To
-revert this behavior for a directory, delete the .galleruby.skip file.
-    ./make_titles.rb ~/Pictures/Albums
-
-Second, you just need to run gallerubify - but copy config.yml.dist to
-config.yml and edit it first. Running gallerubify will take some time, as it's
-generating three resized versions of your files for publishing. You can change
-what these sizes are by editing config.yml.
-    ./gallerubify.rb ~/Pictures/Albums
-
-Third, you need to put the static directory in your output dir:
-    cp -r static output/
-
-Example
-=======
-
-Here's how you'd get started, assuming the above layout. Notice that defaults
-were accepted for most values except the title of the birthday party album, and
-that we skipped publishing "Very private photos" by pressing ctrl-D.
-
-    $ ./make_titles.rb ~/Pictures/Albums
-    > Directory Hiking at Daley Ranch, 6 files
-       What should the title be? [Hiking at Daley Ranch]
-
-       What should the link name be? [hikingatdaleyranch]
-
-    > Directory Joshua Tree Climbing, 11 files
-       What should the title be? [Joshua Tree Climbing]
-
-       What should the link name be? [joshuatreeclimbing]
-
-    > Directory Very Private Album, 1 files
-       What should the title be? [Very Private Album]
-    ^D
-       Skipping album
-
-    $ ./gallerubify.rb ~/Pictures/Albums
-    Hiking at Daley Ranch: Processing album
-    Hiking at Daley Ranch: Rendering HTML
-    Joshua Tree Climbing: Processing album
-    Joshua Tree Climbing: Rendering HTML
-    All done! Generating index.
-
-    $ cp -vr static output/
-    static -> output/static
-    static/close.png -> output/static/close.png
-    static/galleruby.css -> output/static/galleruby.css
-    static/galleruby.js -> output/static/galleruby.js
-    static/jquery-1.5.min.js -> output/static/jquery-1.5.min.js
-    static/next.png -> output/static/next.png
-    static/previous.png -> output/static/previous.png
-
-    $ s3sync.rb -vrp output/ my_gallery_bucket:
+[guide]: GETTING_STARTED.md
+[installing]: INSTALLING.md
