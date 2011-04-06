@@ -23,8 +23,8 @@ def main
     config_file = nil
     config = {}
     parser = OptionParser.new do |opts|
-      opts.banner = "Usage: gallerubify [OPTION] ... DIR"
-      opts.program_name = 'gallerubify'
+      opts.banner = "Usage: galleruby [OPTION] ... DIR"
+      opts.program_name = 'galleruby'
       opts.version = Galleruby::VERSION
 
       opts.on("-c", "--config FILE", "Read configuration options from FILE.") do |c|

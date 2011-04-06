@@ -16,11 +16,11 @@ directory when you run make_titles (and not create a .galleruby.yml). To revert
 this behavior for a directory, delete the .galleruby.skip file.
     make_titles ~/Pictures/Albums
 
-Second, you just need to run gallerubify - but copy config.yml.dist to
-config.yml and edit it first. Running gallerubify will take some time, as it's
+Second, you just need to run galleruby - but copy config.yml.dist to
+config.yml and edit it first. Running galleruby will take some time, as it's
 generating three resized versions of your files for publishing. You can change
 what these sizes are by editing config.yml.
-    gallerubify --title "Joe's Gallery" ~/Pictures/Albums
+    galleruby --title "Joe's Gallery" ~/Pictures/Albums
 
 Third, you need to put the static directory in your output dir:
     cp -r static output/
@@ -48,7 +48,7 @@ that we skipped publishing "Very private photos" by pressing ctrl-D.
     ^D
        Skipping album
 
-    $ gallerubify --title "Joe's Gallery" ~/Pictures/Albums
+    $ galleruby --title "Joe's Gallery" ~/Pictures/Albums
     Hiking at Daley Ranch: Processing album
     Hiking at Daley Ranch: Rendering HTML
     Joshua Tree Climbing: Processing album
