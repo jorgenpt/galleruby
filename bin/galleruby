@@ -21,6 +21,133 @@ def extract_files(from, to)
   end
 end
 
+def make_titles(config, directory)
+  Dir.new(directory).each { |album|
+      settings_file = "#{directory}/#{album}/.galleruby.yml"
+      skip_file = "#{directory}/#{album}/.galleruby.skip"
+
+      next if album.start_with? '.'
+      next if not File.directory? "#{directory}/#{album}"
+      next if File.exist? skip_file
+
+      info = {}
+      if File.exist? settings_file then
+          info = YAML::load(File.read(settings_file))
+      end
+
+      next if info.has_key? 'link' and info.has_key? 'title'
+
+      puts "> Directory #{album}, #{Dir.entries(directory + "/" + album).length - 2} files"
+
+      if not info.has_key? 'title' then
+          default_title = album.sub(/^\d+-\d+-\d+( - \d+)?/, '').strip
+          puts "   What should the title be? [#{default_title}]"
+          title = STDIN.gets
+          if title.nil?
+              FileUtils.touch skip_file
+              puts "   Skipping album"
+              next
+          else
+              title = title.chomp
+          end
+
+          if title.empty? then
+              title = default_title
+          end
+
+          info['title'] = title
+      end
+
+      if not info.has_key? 'link' then
+          default_link = info['title'].sub(/^\d+-\d+-\d+( - \d+)?/, '').downcase
+          default_link = default_link.sub('ø', 'oe').sub('å', 'aa').sub('æ', 'ae')
+          default_link.gsub!(/[^a-z0-9_-]/, '')
+          puts "   What should the link name be? [#{default_link}]"
+          link = STDIN.gets
+          if link.nil?
+              FileUtils.touch skip_file
+              puts "   Skipping album"
+              next
+          else
+              link = link.chomp
+          end
+
+          if link.empty? then
+              link = default_link
+          end
+
+          info['link'] = link
+      end
+
+      File.open(settings_file, 'w') {|file| file.write(YAML.dump(info)) }
+  }
+end
+
+def generate_gallery(config, directory)
+    # We make sure to copy all the static resources.
+    puts "Copying static resources to output."
+    Dir["#{config[:static_files]}/*"].each do |path|
+      output_path = "#{config[:output]}/static/#{File.basename(path)}"
+      puts "cp #{path} #{output_path}" if config[:verbose]
+      FileUtils.cp(path, output_path)
+    end
+
+    puts "Done! Enumerating albums."
+
+    # This dynamically generates a list of all the HAML templates referenced during
+    # a render of album.haml, which we use to figure out if any of them have been
+    # modified since last we generated.
+    deps = Galleruby::TemplateDependencyCalculator.new('album', config)
+    templates_modified = deps.files.collect { |file|
+        path = deps.template_path(file)
+        File.exist?(path) ? File.mtime(path) : Time.now
+    }
+    templates_modified = templates_modified.max
+
+    encountered_links = {}
+
+    # We iterate over each directory inside the directory passed on the commandline,
+    # checking if any of them are considered valid albums (have .galleruby.yml etc,
+    # see Album#valid?) and regenerate thumbnails & HTML if its needed.
+    albums_by_year = Hash.new { |hash, key| hash[key] = [] }
+    Dir.new(directory).each do |album|
+        album = Galleruby::Album.new(directory, album)
+
+        next if not album.valid?
+
+        if encountered_links.has_key?(album.link) then
+          puts "#{album.name}: WARNING! This album has the same link name as '#{encountered_links[album.link]}', skipping."
+          next
+        end
+
+        encountered_links[album.link] = album.name
+
+        if config[:force] or album.needs_updating?(config[:output], templates_modified) then
+            puts "#{album.name}: Processing album"
+            if not album.process(config, config[:output]) then
+                puts "#{album.name}: WARNING! No images to process, skipping"
+                next
+            end
+
+            puts "#{album.name}: Rendering HTML"
+            album.render_to(config, config[:output])
+        else
+            puts "#{album.name}: No update needed, skipping"
+        end
+
+        albums_by_year[album.year] << album
+    end
+
+    puts "All done! Generating index."
+
+    # Finally we generate the index unconditionally, since it's a really cheap
+    # operation. It's possible that we should not do this unless neeed, so that
+    # index.html's mtime will have some value.
+    albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
+    Galleruby::Template.new('index', config).render_to("#{config[:output]}/index.html", {:albums_by_year => albums_by_year}, config[:output])
+
+end
+
 def main
     # These are the default options
     default_config = {
@@ -34,6 +161,9 @@ def main
         :verbose => false,
         :force => false
     }
+
+    do_make_titles = nil
+    do_generate_gallery = nil
 
     config_file = nil
     config = {}
@@ -68,6 +198,17 @@ def main
 
       opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
         config[:verbose] = v
+      end
+
+      opts.separator("")
+      opts.separator("The following options set the mode of operation. Default is *both*.")
+
+      opts.on("--[no-]make-titles", "Set titles for all the albums.") do |v|
+        do_make_titles = v
+      end
+
+      opts.on("--[no-]generate-gallery", "Generate a gallery from the albums.") do |v|
+        do_generate_album = v
       end
 
       opts.separator("")
@@ -142,67 +283,15 @@ def main
     # loaded options, and at last it falls back to the default config.
     config = default_config.merge(loaded_config.merge(config))
 
-    # We make sure to copy all the static resources.
-    puts "Copying static resources to output."
-    Dir["#{config[:static_files]}/*"].each do |path|
-      output_path = "#{config[:output]}/static/#{File.basename(path)}"
-      puts "cp #{path} #{output_path}" if config[:verbose]
-      FileUtils.cp(path, output_path)
+    if do_make_titles.nil? and do_generate_gallery.nil? then
+      do_make_titles = do_generate_gallery = true
+    else
+      do_make_titles = false if do_make_titles.nil?
+      do_generate_gallery = false if do_generate_gallery.nil?
     end
 
-    puts "Done! Enumerating albums."
-
-    # This dynamically generates a list of all the HAML templates referenced during
-    # a render of album.haml, which we use to figure out if any of them have been
-    # modified since last we generated.
-    deps = Galleruby::TemplateDependencyCalculator.new('album', config)
-    templates_modified = deps.files.collect { |file|
-        path = deps.template_path(file)
-        File.exist?(path) ? File.mtime(path) : Time.now
-    }
-    templates_modified = templates_modified.max
-
-    encountered_links = {}
-
-    # We iterate over each directory inside the directory passed on the commandline,
-    # checking if any of them are considered valid albums (have .galleruby.yml etc,
-    # see Album#valid?) and regenerate thumbnails & HTML if its needed.
-    albums_by_year = Hash.new { |hash, key| hash[key] = [] }
-    Dir.new(directory).each do |album|
-        album = Galleruby::Album.new(directory, album)
-
-        next if not album.valid?
-
-        if encountered_links.has_key?(album.link) then
-          puts "#{album.name}: WARNING! This album has the same link name as '#{encountered_links[album.link]}', skipping."
-          next
-        end
-
-        encountered_links[album.link] = album.name
-
-        if config[:force] or album.needs_updating?(config[:output], templates_modified) then
-            puts "#{album.name}: Processing album"
-            if not album.process(config, config[:output]) then
-                puts "#{album.name}: WARNING! No images to process, skipping"
-                next
-            end
-
-            puts "#{album.name}: Rendering HTML"
-            album.render_to(config, config[:output])
-        else
-            puts "#{album.name}: No update needed, skipping"
-        end
-
-        albums_by_year[album.year] << album
-    end
-
-    puts "All done! Generating index."
-
-    # Finally we generate the index unconditionally, since it's a really cheap
-    # operation. It's possible that we should not do this unless neeed, so that
-    # index.html's mtime will have some value.
-    albums_by_year = albums_by_year.sort_by { |e| e[0] }.reverse.map {|year, albums| {:year => year, :albums => albums.map {|album| album.template_info }.sort_by {|album| album[:first]}.reverse } }
-    Galleruby::Template.new('index', config).render_to("#{config[:output]}/index.html", {:albums_by_year => albums_by_year}, config[:output])
+    make_titles(config, directory) if do_make_titles
+    generate_gallery(config, directory) if do_generate_gallery
 
     return 0
 end
