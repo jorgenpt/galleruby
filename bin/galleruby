@@ -86,6 +86,7 @@ end
 def generate_gallery(config, directory)
     # We make sure to copy all the static resources.
     puts "Copying static resources to output."
+    FileUtils.mkdir_p("#{config[:output]}/static")
     Dir["#{config[:static_files]}/*"].each do |path|
       output_path = "#{config[:output]}/static/#{File.basename(path)}"
       puts "cp #{path} #{output_path}" if config[:verbose]
