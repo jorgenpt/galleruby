@@ -155,6 +155,7 @@ def main
         :thumb => [320, 256],
         :medium => [800, 600],
         :large => [1280, 1024],
+        :publish_originals => false,
         :templates => "#{File.dirname(__FILE__)}/../templates",
         :static_files => "#{File.dirname(__FILE__)}/../static",
         :output => 'output',
@@ -176,12 +177,16 @@ def main
         config_file = c
       end
 
-      opts.on("-o", "--output DIRECTORY", "Generates output gallery in DIRECTORY instead of the default 'output'") do |d|
+      opts.on("-o", "--output DIRECTORY", "Generates output gallery in DIRECTORY instead of the default 'output'.") do |d|
         config[:output] = d
       end
 
-      opts.on("-t", "--title TITLE", "Set gallery title to TITLE") do |t|
+      opts.on("-t", "--title TITLE", "Set gallery title to TITLE.") do |t|
         config[:title] = t
+      end
+
+      opts.on("-p", "--publish-originals", "Publish original size images as well as resized copies.") do |p|
+        config[:publish_originals] = p
       end
 
       opts.on("--templates DIRECTORY", "Read templates from DIRECTORY.") do |d|
@@ -282,6 +287,12 @@ def main
     # command-line options. Commandline options are the most important, then
     # loaded options, and at last it falls back to the default config.
     config = default_config.merge(loaded_config.merge(config))
+
+    if config[:publish_originals] then
+      config[:direct_link_source] = 'original'
+    else
+      config[:direct_link_source] = 'large'
+    end
 
     if do_make_titles.nil? and do_generate_gallery.nil? then
       do_make_titles = do_generate_gallery = true

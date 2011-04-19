@@ -83,7 +83,7 @@ function slideshow_show(image) {
     $("#slideshow_image").attr('src', image_dir + '/' + images[image]);
     document.location.hash = 'slideshow=' + current_image;
 
-    $("#slideshow_fullsize_link").attr('href', 'large/' + images[image]);
+    $("#slideshow_fullsize_link").attr('href', direct_link_source + '/' + images[image]);
 
     if (image >= images.length - 1)
         $("#slideshow_next").hide();

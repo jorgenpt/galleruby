@@ -4,6 +4,7 @@
   var thumb_dimensions = #{config[:thumb].inspect};
   var medium_dimensions = #{config[:medium].inspect};
   var large_dimensions = #{config[:large].inspect};
+  var direct_link_source = #{config[:direct_link_source].inspect};
 
 %script{:type => 'text/javascript', :src => base_relative("static/jquery-1.5.min.js")}
 %script{:type => 'text/javascript', :src => base_relative("static/galleruby.js")}

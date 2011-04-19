@@ -9,6 +9,7 @@ title: Cool Joe's Gallery
 # thumb: [320, 256]
 # medium: [800, 600]
 # large: [1280, 1024]
+# publish-originals: false
 # templates: "/some/path/inside/the/gem/templates"
 # static-files: "/some/path/inside/the/gem/static"
 # output: output

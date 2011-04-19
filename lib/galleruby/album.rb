@@ -103,8 +103,10 @@ module Galleruby
           output_thumb = "#{output_album}/small"
           output_medium = "#{output_album}/medium"
           output_large = "#{output_album}/large"
+          output_original = "#{output_album}/original"
 
           FileUtils.mkdir_p [output_thumb, output_medium, output_large]
+          FileUtils.mkdir_p output_original if config[:publish_originals]
 
           @images_by_date = Hash.new {|hash, key| hash[key] = [] }
           first_taken, last_taken = nil, nil
@@ -118,9 +120,14 @@ module Galleruby
               thumb_filename = "#{output_thumb}/#{entry}"
               medium_filename = "#{output_medium}/#{entry}"
               large_filename = "#{output_large}/#{entry}"
+              original_filename = "#{output_original}/#{entry}"
 
               image = LazyObject.new { o = Magick::Image.read(filename).first; o.auto_orient!; o }
               original_mtime = File.mtime filename
+
+              if config[:publish_originals] and file_needs_updating?(original_filename, original_mtime) then
+                  FileUtils.cp(filename, original_filename)
+              end
 
               if file_needs_updating?(large_filename, original_mtime) then
                   new_image = image.resize_to_fit(*config[:large])
